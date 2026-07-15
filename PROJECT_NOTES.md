@@ -70,6 +70,13 @@ audio) automatically at the correct times:
   auto-detect vs manual location, notifications toggle, reset to defaults.
 - **Other**: live countdown, activity log, "now playing" bar, browser notifications,
   PWA installable, daily midnight refresh.
+- **Background-tab reliability** (added after user reported athan not firing when minimized):
+  Web Worker clock (exempt from background timer throttling), inaudible keep-alive audio
+  loop started on the welcome tap (marks the tab as playing media → exempt from tab freezing
+  / Memory Saver / App Nap), visibility/focus catch-up with a 10-minute grace window
+  (recently missed events still play; older ones are logged as missed), and an on-page
+  "reliability tips" panel (keep window visible, Chrome Memory Saver exception, install as
+  app, keep the computer awake).
 
 ## 5. Podcast (evolution & current state)
 

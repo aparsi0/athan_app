@@ -22,7 +22,9 @@
       "Bash(python3)",
       "Bash(git add *)",
       "Bash(git commit -m 'Play identical YouTube recordings in podcast; Test Athan cycles per-prayer files *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git commit -m 'Add PROJECT_NOTES.md — full project history and current state *)",
+      "Bash(git commit -m 'Keep athan firing in background/minimized tabs *)"
     ]
   }
 }

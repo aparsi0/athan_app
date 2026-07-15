@@ -135,6 +135,8 @@ main {
 .special-row { justify-content: space-between; font-size: 14.5px; color: var(--text); }
 
 .hint { margin-top: 12px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.reliability-tips summary { cursor: pointer; color: var(--gold-soft); }
+.reliability-tips ul { margin: 10px 0 4px 18px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Status log */
 .status-log {

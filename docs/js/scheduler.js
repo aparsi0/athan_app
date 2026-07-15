@@ -86,11 +86,32 @@ const Scheduler = {
     this.stop();
     this.lastTick = new Date();
     this.timer = setInterval(() => this._tick(), 1000);
+
+    // Background tabs get their page timers throttled (or frozen) by the
+    // browser. Web Worker timers are exempt from intensive throttling, so a
+    // tiny worker acts as a reliable clock while the tab is hidden.
+    try {
+      const workerSrc = URL.createObjectURL(new Blob(
+        ["setInterval(() => postMessage('tick'), 1000);"],
+        { type: 'application/javascript' }
+      ));
+      this.worker = new Worker(workerSrc);
+      this.worker.onmessage = () => this._tick();
+    } catch (e) {
+      console.warn('Timer worker unavailable, using page timer only', e);
+    }
+
+    // If the tab was suspended anyway, catch up the moment it wakes.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this._tick();
+    });
+    window.addEventListener('focus', () => this._tick());
   },
 
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    if (this.worker) { this.worker.terminate(); this.worker = null; }
   },
 
   _tick() {
@@ -105,10 +126,18 @@ const Scheduler = {
 
     // Fire events whose time was crossed since the last tick. Events already
     // in the past when the page loaded are NOT fired (matches the desktop
-    // app skipping already-passed times).
+    // app skipping already-passed times). If the tab slept through an event,
+    // it still plays if the event is recent (grace window); much older missed
+    // events are only reported, so a long-suspended tab doesn't fire hours of
+    // backlogged audio at once.
+    const GRACE_MS = 10 * 60 * 1000;
     for (const event of this.events) {
       if (event.time > this.lastTick && event.time <= now) {
-        this.onEvent?.(event);
+        if (now - event.time > GRACE_MS) {
+          this.onEvent?.({ ...event, missed: true });
+        } else {
+          this.onEvent?.(event);
+        }
       }
     }
     this.lastTick = now;

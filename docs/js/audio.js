@@ -8,6 +8,34 @@ const AudioManager = {
   currentLabel: null,
   unlocked: false,
   onStateChange: null, // callback(label|null)
+  _keepAlive: null,
+
+  /**
+   * Loop an ultra-quiet (inaudible, ~-60 dB) audio signal so the browser
+   * treats the tab as playing media. Tabs with active audio are exempt from
+   * tab-freezing, Memory Saver discarding and macOS App Nap — the main
+   * reasons scheduled athan stopped firing in minimized/background tabs.
+   * Must be started from a user gesture (the welcome tap provides one).
+   */
+  startKeepAlive() {
+    if (this._keepAlive) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * 5, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i += 449) data[i] = 0.001; // sparse, inaudible
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(ctx.destination);
+      source.start();
+      this._keepAlive = { ctx, source };
+      // Some browsers auto-suspend contexts; resume whenever possible.
+      setInterval(() => { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); }, 30000);
+    } catch (e) {
+      console.warn('Keep-alive audio unavailable', e);
+    }
+  },
 
   /** Must be called from a user gesture (click) to satisfy autoplay policy. */
   async unlock() {

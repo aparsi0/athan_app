@@ -96,6 +96,12 @@ const App = {
       return;
     }
 
+    if (event.missed) {
+      this.logStatus(`⏰ Missed ${event.label} at ${this.fmtTime(event.time)} — the tab was suspended by the browser. Keep the tab open (not just minimized), or see the tips in the panel below.`);
+      this.renderSchedule();
+      return;
+    }
+
     this.logStatus(`▶ ${event.label} — ${this.fmtTime(event.time)}`);
     this.notify(event.label);
     Podcast.pause(); // prayer audio takes priority over the podcast
@@ -244,6 +250,7 @@ const App = {
     const gate = document.getElementById('soundGate');
     document.getElementById('enableSoundBtn').addEventListener('click', async () => {
       const ok = await AudioManager.unlock();
+      AudioManager.startKeepAlive();
       gate.classList.add('hidden');
       this.logStatus(ok ? '🔊 Sound enabled — athan will play automatically.' : '⚠️ Sound could not be enabled.');
       if (Config.get('ui_settings.show_notifications', true) && 'Notification' in window && Notification.permission === 'default') {
@@ -298,6 +305,7 @@ const App = {
     this.logStatus(`Testing ${PRAYER_LABELS[prayer].en} athan (${i + 1}/${PRAYER_NAMES.length}) — its own audio file.`);
 
     await AudioManager.unlock();
+    AudioManager.startKeepAlive();
     Podcast.pause();
     AudioManager.play(file, Config.get('audio_settings.athan_volume', 0.8), label);
   },
