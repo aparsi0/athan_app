@@ -48,6 +48,42 @@ const App = {
     document.getElementById('locationText').textContent = this.describeLocation();
   },
 
+  /** Explicitly request the browser's precise location and rebuild the schedule. */
+  async useMyLocation(quiet) {
+    if (!quiet) this.logStatus('Requesting your precise location…');
+    const precise = await LocationService._fromBrowserGeolocation();
+    if (!precise) {
+      if (!quiet) this.logStatus('⚠️ Location permission denied or unavailable — using ' + this.describeLocation() + '. You can set coordinates manually in Settings.');
+      return;
+    }
+    const named = await LocationService._reverseGeocode(precise.latitude, precise.longitude);
+    this.location = { ...Config.get('location'), ...precise, ...named };
+    Config.set('location', this.location);
+    document.getElementById('locationText').textContent = this.describeLocation();
+    this.logStatus(`📍 Location set to ${this.describeLocation()} — updating prayer times…`);
+    await this.loadPrayerTimes();
+  },
+
+  togglePodcast() {
+    const holder = document.getElementById('podcastEmbed');
+    const btn = document.getElementById('podcastBtn');
+    if (holder.childElementCount) {
+      holder.innerHTML = '';
+      btn.textContent = '🎙 Play Podcast';
+      return;
+    }
+    const iframe = document.createElement('iframe');
+    iframe.src = 'https://open.spotify.com/embed/show/5d4FhdBUAYt220XU5seoUy?theme=0';
+    iframe.width = '100%';
+    iframe.height = '232';
+    iframe.frameBorder = '0';
+    iframe.allow = 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
+    iframe.loading = 'lazy';
+    holder.appendChild(iframe);
+    btn.textContent = '✕ Hide Podcast';
+    this.logStatus('🎙 Podcast player opened.');
+  },
+
   describeLocation() {
     const l = this.location || Config.get('location');
     const parts = [l.city, l.state || l.country].filter(Boolean);
@@ -232,7 +268,16 @@ const App = {
       if (Config.get('ui_settings.show_notifications', true) && 'Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
       }
+      // Ask for the visitor's precise location (user gesture makes the
+      // browser permission prompt most reliable here).
+      if (Config.get('location.auto_detect', true) && this.location?.location_source !== 'browser_geolocation') {
+        this.useMyLocation(true);
+      }
     });
+
+    document.getElementById('locateBtn').addEventListener('click', () => this.useMyLocation(false));
+
+    document.getElementById('podcastBtn').addEventListener('click', () => this.togglePodcast());
 
     document.getElementById('testBtn').addEventListener('click', async () => {
       this.logStatus('Testing athan audio…');

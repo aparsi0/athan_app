@@ -18,9 +18,9 @@
     <div class="sound-gate-card">
       <div class="gate-icon">🕌</div>
       <h2>Athan Web</h2>
-      <p>Your browser requires one tap before audio can play automatically.<br />
-         Tap below to enable the athan, then keep this tab open.</p>
-      <button id="enableSoundBtn" class="btn primary big">🔊 Enable Athan Sound</button>
+      <p>Tap below to enable athan audio and detect your location for accurate
+         prayer times wherever you are. Then keep this tab open.</p>
+      <button id="enableSoundBtn" class="btn primary big">🔊 Enable Athan &amp; Location</button>
     </div>
   </div>
 
@@ -32,7 +32,10 @@
         <div class="sub" id="locationText">Detecting location…</div>
       </div>
     </div>
-    <button id="settingsBtn" class="btn icon" title="Settings">⚙️</button>
+    <div class="header-actions">
+      <button id="locateBtn" class="btn icon" title="Use my location">📍</button>
+      <button id="settingsBtn" class="btn icon" title="Settings">⚙️</button>
+    </div>
   </header>
 
   <main>
@@ -59,6 +62,15 @@
       <h3>Scheduled Audio Events</h3>
       <ul id="specialList" class="special-list"></ul>
       <p class="hint">Woduaa plays before each prayer, Duaa after each athan. Keep this tab open (or install the app from your browser menu) for audio to play on time.</p>
+    </section>
+
+    <section class="card">
+      <h3>Podcast</h3>
+      <div class="podcast-row">
+        <button id="podcastBtn" class="btn">🎙 Play Podcast</button>
+        <a class="podcast-link" href="https://open.spotify.com/show/5d4FhdBUAYt220XU5seoUy" target="_blank" rel="noopener">Open in Spotify ↗</a>
+      </div>
+      <div id="podcastEmbed" class="podcast-embed"></div>
     </section>
 
     <section class="card">
