@@ -72,8 +72,8 @@ const Scheduler = {
 
       const labels = {
         friday_before_dhuhr: 'Surat Al-Kahf (Friday)',
-        morning_audio: 'Morning audio',
-        night_audio: 'Night audio'
+        morning_audio: 'Morning Azkar',
+        night_audio: 'Night Azkar'
       };
       this.events.push({ name: eventName, kind: eventName, time: at, label: labels[eventName] });
     }

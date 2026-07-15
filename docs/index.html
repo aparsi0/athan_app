@@ -18,8 +18,9 @@
     <div class="sound-gate-card">
       <div class="gate-icon">🕌</div>
       <h2>Athan Web</h2>
-      <p>Tap below to enable athan audio and detect your location for accurate
-         prayer times wherever you are. Then keep this tab open.</p>
+      <p>This app gives you prayer times calculated for <strong>your own location</strong> —
+         your latitude &amp; longitude and timezone, wherever you are in the world.<br />
+         Tap below to enable athan audio and detect your location. Then keep this tab open.</p>
       <button id="enableSoundBtn" class="btn primary big">🔊 Enable Athan &amp; Location</button>
     </div>
   </div>
@@ -40,6 +41,7 @@
 
   <main>
     <section class="card hero">
+      <p class="tagline">Prayer times are calculated from your location — latitude &amp; longitude — so this page is accurate anywhere in the world.</p>
       <div class="dates">
         <span id="gregorianDate"></span>
         <span id="hijriDate" class="hijri"></span>
@@ -66,11 +68,17 @@
 
     <section class="card">
       <h3>Podcast</h3>
+      <div id="podcastTitle" class="podcast-title"></div>
+      <div id="podcastSubtitle" class="podcast-subtitle"></div>
       <div class="podcast-row">
         <button id="podcastBtn" class="btn">🎙 Play Podcast</button>
         <a class="podcast-link" href="https://open.spotify.com/show/5d4FhdBUAYt220XU5seoUy" target="_blank" rel="noopener">Open in Spotify ↗</a>
       </div>
-      <div id="podcastEmbed" class="podcast-embed"></div>
+      <div id="podcastPanel" class="podcast-panel">
+        <audio id="podcastPlayer" controls preload="none" style="display:none"></audio>
+        <ol id="podcastList" class="podcast-list"></ol>
+        <p class="hint">Complete playlist in Quran order — Al-Fatiha (1) to An-Nas (114) — the inverse of Spotify's newest-first listing. Episodes play in full and continue automatically. Recordings served by mp3quran.net.</p>
+      </div>
     </section>
 
     <section class="card">
@@ -120,11 +128,11 @@
         <div class="inline">Vol <input type="range" id="vol_friday_before_dhuhr" min="0" max="1" step="0.05" /></div>
       </div>
       <div class="special-setting">
-        <label><input type="checkbox" id="sp_morning_audio" /> Morning audio</label>
+        <label><input type="checkbox" id="sp_morning_audio" /> Morning Azkar</label>
         <div class="inline">Vol <input type="range" id="vol_morning_audio" min="0" max="1" step="0.05" /></div>
       </div>
       <div class="special-setting">
-        <label><input type="checkbox" id="sp_night_audio" /> Night audio</label>
+        <label><input type="checkbox" id="sp_night_audio" /> Night Azkar</label>
         <div class="inline">Vol <input type="range" id="vol_night_audio" min="0" max="1" step="0.05" /></div>
       </div>
 
@@ -154,6 +162,7 @@
   <script src="js/location.js"></script>
   <script src="js/prayer-times.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/podcast.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/app.js"></script>
 </body>

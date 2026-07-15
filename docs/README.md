@@ -2,6 +2,8 @@
 
 The browser version of the Athan desktop app — same features, shareable with anyone via a link, on any computer or phone. No installation, no Python, no VLC.
 
+Prayer times are calculated from each visitor's own location (latitude & longitude) and timezone, so one link is accurate anywhere in the world.
+
 ## Features (parity with the desktop app)
 
 - Automatic location detection (browser geolocation → IP fallback → manual coordinates)
@@ -10,7 +12,8 @@ The browser version of the Athan desktop app — same features, shareable with a
 - Woduaa reminder 15 minutes before each prayer
 - Duaa right after each athan finishes
 - Surat Al-Kahf on Fridays (Dhuhr + 120 min)
-- Morning audio (Dhuhr − 240 min) and night audio (Asr + 135 min)
+- Morning Azkar (Dhuhr − 240 min) and Night Azkar (Asr + 135 min)
+- Podcast playlist: the complete mushaf of Sheikh Mahmoud Ali Al-Banna in Quran order (Al-Fatiha → An-Nas), playable on-site, with a link to the Spotify show
 - Live next-prayer countdown, Hijri date, activity log
 - Settings panel (per-visitor, saved in the browser)
 - Browser notifications

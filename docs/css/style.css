@@ -69,6 +69,13 @@ main {
 
 /* Hero */
 .hero { text-align: center; padding: 28px 20px; }
+.tagline {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 480px;
+  margin: 0 auto 16px;
+}
 .dates { display: flex; flex-direction: column; gap: 2px; margin-bottom: 18px; color: var(--muted); font-size: 14px; }
 .hijri { color: var(--gold-soft); }
 .next-label { font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); }
@@ -251,11 +258,44 @@ main {
 .header-actions { display: flex; gap: 8px; }
 
 /* Podcast */
+.podcast-title { font-size: 16.5px; color: var(--text); margin-bottom: 2px; }
+.podcast-subtitle { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
 .podcast-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .podcast-link { color: var(--gold-soft); font-size: 13.5px; text-decoration: none; }
 .podcast-link:hover { text-decoration: underline; }
-.podcast-embed { margin-top: 14px; }
-.podcast-embed iframe { border-radius: 12px; display: block; }
+.podcast-panel { display: none; margin-top: 14px; }
+.podcast-panel.open { display: block; }
+.podcast-panel audio { width: 100%; margin-bottom: 12px; }
+.podcast-list {
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--card-edge);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.15);
+}
+.podcast-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.12s;
+}
+.podcast-item:last-child { border-bottom: none; }
+.podcast-item:hover { background: rgba(212, 175, 55, 0.08); }
+.podcast-item.playing { background: rgba(212, 175, 55, 0.14); }
+.podcast-item.playing .pc-name { color: var(--gold); }
+.pc-num {
+  min-width: 30px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.pc-name { flex: 1; font-size: 16px; direction: rtl; text-align: right; }
+.pc-state { color: var(--gold); min-width: 16px; }
 
 footer {
   text-align: center;

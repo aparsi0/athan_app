@@ -7,7 +7,17 @@
       "Bash(sips -z 192 192 icon-512.png --out icon-192.png)",
       "Bash(sips -z 180 180 icon-512.png --out icon-180.png)",
       "Bash(timeout 5 git credential-osxkeychain get)",
-      "Bash(gh repo *)"
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(curl -s \"https://open.spotify.com/embed/show/5d4FhdBUAYt220XU5seoUy\" -H \"User-Agent: Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36\" -o embed.html)",
+      "Bash(python3 -c \"import urllib.parse; print\\(urllib.parse.quote\\('المصحف المرتل البنا'\\)\\)\")",
+      "Bash(curl -s \"https://itunes.apple.com/search?term=$\\(python3 -c \"import urllib.parse; print\\(urllib.parse.quote\\('المصحف المرتل البنا'\\)\\)\"\\)&media=podcast&limit=10\")",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -sL -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/126.0 Safari/537.36\" \"https://ar.islamway.net/feeds/mushaf-podcast/145.rss\" -o banna.rss)",
+      "Bash(curl -sL --compressed -H \"Accept: application/rss+xml, application/xml, text/xml, */*\" -A \"Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 Chrome/126.0 Safari/537.36\" --max-time 40 \"https://ar.islamway.net/feeds/mushaf-podcast/145.rss\" -o banna.rss)",
+      "Bash(curl -s -o /dev/null -w \"murattal 001: HTTP %{http_code}, %{size_download} bytes \\(range\\)\\\\n\" -r 0-1000 \"https://server8.mp3quran.net/bna/001.mp3\")",
+      "Bash(curl -s -o /dev/null -w \"murattal 114: HTTP %{http_code}\\\\n\" -r 0-100 \"https://server8.mp3quran.net/bna/114.mp3\")",
+      "Bash(curl -s -I \"https://server8.mp3quran.net/bna/001.mp3\")"
     ]
   }
 }

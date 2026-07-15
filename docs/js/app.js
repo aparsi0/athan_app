@@ -64,26 +64,6 @@ const App = {
     await this.loadPrayerTimes();
   },
 
-  togglePodcast() {
-    const holder = document.getElementById('podcastEmbed');
-    const btn = document.getElementById('podcastBtn');
-    if (holder.childElementCount) {
-      holder.innerHTML = '';
-      btn.textContent = '🎙 Play Podcast';
-      return;
-    }
-    const iframe = document.createElement('iframe');
-    iframe.src = 'https://open.spotify.com/embed/show/5d4FhdBUAYt220XU5seoUy?theme=0';
-    iframe.width = '100%';
-    iframe.height = '232';
-    iframe.frameBorder = '0';
-    iframe.allow = 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';
-    iframe.loading = 'lazy';
-    holder.appendChild(iframe);
-    btn.textContent = '✕ Hide Podcast';
-    this.logStatus('🎙 Podcast player opened.');
-  },
-
   describeLocation() {
     const l = this.location || Config.get('location');
     const parts = [l.city, l.state || l.country].filter(Boolean);
@@ -277,7 +257,8 @@ const App = {
 
     document.getElementById('locateBtn').addEventListener('click', () => this.useMyLocation(false));
 
-    document.getElementById('podcastBtn').addEventListener('click', () => this.togglePodcast());
+    document.getElementById('podcastBtn').addEventListener('click', () => Podcast.toggle());
+    Podcast.init();
 
     document.getElementById('testBtn').addEventListener('click', async () => {
       this.logStatus('Testing athan audio…');
