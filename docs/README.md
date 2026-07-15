@@ -24,13 +24,13 @@ The browser version of the Athan desktop app — same features, shareable with a
 ## Run locally
 
 ```bash
-python3 -m http.server 8734 --directory web
+python3 -m http.server 8734 --directory docs
 # open http://localhost:8734
 ```
 
 ## Deploy / update
 
-Hosted on GitHub Pages. Any push to `main` that touches `web/` redeploys automatically to the same URL (see `.github/workflows/deploy-pages.yml`).
+Hosted on GitHub Pages. Any push to `main` that touches `docs/` redeploys automatically to the same URL (GitHub Pages serves the `docs/` folder).
 
 ```bash
 git add -A && git commit -m "Update site" && git push
