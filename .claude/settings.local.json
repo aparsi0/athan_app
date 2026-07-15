@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(qlmanage -t -s 512 -o . icon.svg)",
+      "Bash(mv icon.svg.png icon-512.png)",
+      "Bash(sips -z 192 192 icon-512.png --out icon-192.png)",
+      "Bash(sips -z 180 180 icon-512.png --out icon-180.png)"
+    ]
+  }
+}

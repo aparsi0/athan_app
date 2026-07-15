@@ -1,0 +1,25 @@
+# Virtual environment (machine-specific)
+.venv/
+
+# PyInstaller build artifacts (machine-specific)
+build/
+dist/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS junk
+.DS_Store
+**/.DS_Store
+
+# Runtime logs and user config (created fresh per machine)
+athan_app.log
+*.log
+
+# Reload sentinel
+.reload_request
+
+# Personal photo — not for publishing
+*.HEIC
