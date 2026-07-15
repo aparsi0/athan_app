@@ -75,8 +75,9 @@ audio) automatically at the correct times:
   loop started on the welcome tap (marks the tab as playing media → exempt from tab freezing
   / Memory Saver / App Nap), visibility/focus catch-up with a 10-minute grace window
   (recently missed events still play; older ones are logged as missed), and an on-page
-  "reliability tips" panel (keep window visible, Chrome Memory Saver exception, install as
-  app, keep the computer awake).
+  "reliability tips" panel (keep window visible, Chrome Memory Saver exception, play the
+  Quran podcast — audible playback is the strongest keep-alive signal —, install as app,
+  keep the computer awake).
 
 ## 5. Podcast (evolution & current state)
 
@@ -128,6 +129,16 @@ audio) automatically at the correct times:
    **Test Athan per-prayer cycling**. Verified live.
 8. Answered: sharing/autoplay behavior, no-analytics decision, per-visitor settings isolation.
 9. Wrote this file.
+10. **Background-tab reliability fixes** (user reported athan only firing in the focused tab):
+    Web Worker clock, inaudible keep-alive loop, 10-min grace catch-up, tips panel (sw v5).
+11. Added tip that playing the Quran podcast keeps the tab active (sw v6).
+
+## 9. How updates reach visitors
+
+Site changes go live at the same URL ~1 minute after `git push`. The service worker fetches
+the app shell **network-first**, so visitors get the new version on their next page load or
+refresh — no reinstall, no cache clearing. Tabs that are already open keep running the old
+code until reloaded (one refresh + the usual welcome tap).
 
 ## 8. Possible future ideas (not requested yet)
 
