@@ -98,6 +98,7 @@ const App = {
 
     this.logStatus(`▶ ${event.label} — ${this.fmtTime(event.time)}`);
     this.notify(event.label);
+    Podcast.pause(); // prayer audio takes priority over the podcast
 
     if (event.kind === 'athan') {
       const files = Config.get('audio_settings.athan_files', {});
@@ -260,11 +261,8 @@ const App = {
     document.getElementById('podcastBtn').addEventListener('click', () => Podcast.toggle());
     Podcast.init();
 
-    document.getElementById('testBtn').addEventListener('click', async () => {
-      this.logStatus('Testing athan audio…');
-      await AudioManager.unlock();
-      AudioManager.play(Config.get('audio_settings.audio_file'), Config.get('audio_settings.athan_volume', 0.8), 'Athan (test)');
-    });
+    document.getElementById('testBtn').addEventListener('click', () => this.testNextAthan());
+    this.updateTestButton();
 
     document.getElementById('stopBtn').addEventListener('click', () => {
       AudioManager.stop();
@@ -279,6 +277,34 @@ const App = {
       this.openSettings();
       this.logStatus('Settings reset to defaults.');
     });
+  },
+
+  /**
+   * Test button cycles through the five prayers, playing each prayer's own
+   * athan file in turn (Fajr → Dhuhr → Asr → Maghrib → Isha → Fajr …),
+   * so every configured file can be verified — not just the general one.
+   */
+  _testIndexKey: 'athan_web_test_index',
+
+  async testNextAthan() {
+    const i = Number(localStorage.getItem(this._testIndexKey) || 0) % PRAYER_NAMES.length;
+    const prayer = PRAYER_NAMES[i];
+    const files = Config.get('audio_settings.athan_files', {});
+    const file = files[prayer] || Config.get('audio_settings.audio_file');
+    const label = `${PRAYER_LABELS[prayer].en} Athan (test)`;
+
+    localStorage.setItem(this._testIndexKey, String((i + 1) % PRAYER_NAMES.length));
+    this.updateTestButton();
+    this.logStatus(`Testing ${PRAYER_LABELS[prayer].en} athan (${i + 1}/${PRAYER_NAMES.length}) — its own audio file.`);
+
+    await AudioManager.unlock();
+    Podcast.pause();
+    AudioManager.play(file, Config.get('audio_settings.athan_volume', 0.8), label);
+  },
+
+  updateTestButton() {
+    const i = Number(localStorage.getItem(this._testIndexKey) || 0) % PRAYER_NAMES.length;
+    document.getElementById('testBtn').textContent = `▶ Test Athan (${PRAYER_LABELS[PRAYER_NAMES[i]].en})`;
   },
 
   openSettings() {

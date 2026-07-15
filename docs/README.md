@@ -13,7 +13,8 @@ Prayer times are calculated from each visitor's own location (latitude & longitu
 - Duaa right after each athan finishes
 - Surat Al-Kahf on Fridays (Dhuhr + 120 min)
 - Morning Azkar (Dhuhr − 240 min) and Night Azkar (Asr + 135 min)
-- Podcast playlist: the complete mushaf of Sheikh Mahmoud Ali Al-Banna in Quran order (Al-Fatiha → An-Nas), playable on-site, with a link to the Spotify show
+- Podcast playlist: the complete mushaf of Sheikh Mahmoud Ali Al-Banna in Quran order (Al-Fatiha → An-Nas), playing the identical recordings from the YouTube playlist (PL8475A8813886C6A5) via the YouTube player, with links to the Spotify show and the playlist
+- Test Athan button cycles through the five prayers, playing each prayer's own athan file in turn
 - Live next-prayer countdown, Hijri date, activity log
 - Settings panel (per-visitor, saved in the browser)
 - Browser notifications
