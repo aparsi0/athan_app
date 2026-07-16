@@ -94,6 +94,16 @@ You need these things on any computer:
    ```bash
    brew install --cask vlc
    ```
+   > ⚠️ **Apple Silicon note:** VLC must be the **Apple Silicon (arm64)** build.
+   > If VLC was previously downloaded manually, it may be the Intel version, and the
+   > app will later fail with `OSError: dlopen ... libvlccore.dylib ... incompatible
+   > architecture (have 'x86_64', need 'arm64')`. Fix it like this:
+   > ```bash
+   > sudo rm -rf /Applications/VLC.app
+   > brew install --cask vlc
+   > file /Applications/VLC.app/Contents/MacOS/lib/libvlccore.dylib   # must say arm64
+   > ```
+   > (If downloading from videolan.org instead, choose the "macOS — Apple Silicon" installer.)
 6. Go to the project folder:
    ```bash
    cd /path/to/athan_app
