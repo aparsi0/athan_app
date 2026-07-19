@@ -13,7 +13,9 @@
 </head>
 <body>
 
-  <!-- One-time sound permission gate (browser autoplay policy) -->
+  <canvas id="scene"></canvas>
+
+  <!-- One-time sound & location gate (browser autoplay policy) -->
   <div id="soundGate" class="sound-gate">
     <div class="sound-gate-card">
       <div class="gate-icon">🕌</div>
@@ -26,76 +28,159 @@
   </div>
 
   <header>
-    <div class="brand">
-      <span class="crescent">☪</span>
-      <div>
-        <h1>Athan Web</h1>
-        <div class="sub" id="locationText">Detecting location…</div>
-      </div>
-    </div>
     <div class="header-actions">
       <button id="locateBtn" class="btn icon" title="Use my location">📍</button>
-      <button id="settingsBtn" class="btn icon" title="Settings">⚙️</button>
     </div>
+    <div class="brand-mark">☪</div>
+    <div class="brand-stem"></div>
+    <div class="brand-rule"></div>
+    <h1 class="site-title">ATHAN WEB</h1>
+    <div class="site-sub">Prayer times from your own sky</div>
+    <div class="brand-rule"></div>
+    <div class="brand-stem"></div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="athan" class="active">Athan</button>
+      <button data-tab="schedule">Schedule</button>
+      <button data-tab="quran">Quran</button>
+      <button data-tab="activity">Activity</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
   </header>
 
   <main>
-    <section class="card hero">
-      <p class="tagline">Prayer times are calculated from your location — latitude &amp; longitude — so this page is accurate anywhere in the world.</p>
-      <div class="dates">
-        <span id="gregorianDate"></span>
-        <span id="hijriDate" class="hijri"></span>
+    <section class="panel active" id="panel-athan">
+      <div class="card hero">
+        <div class="dates">
+          <span id="gregorianDate"></span>
+          <span id="hijriDate" class="hijri"></span>
+        </div>
+        <div class="loc" id="locationText">Detecting location…</div>
+        <div class="phase-name" id="phaseText"></div>
+        <div class="next-label">Next prayer</div>
+        <div id="nextPrayerName" class="next-name">—</div>
+        <div id="countdown" class="countdown">--:--:--</div>
+        <div class="actions">
+          <button id="testBtn" class="btn">▶ Test Athan</button>
+          <button id="stopBtn" class="btn">■ Stop Audio</button>
+        </div>
       </div>
-      <div class="next-label">Next prayer</div>
-      <div id="nextPrayerName" class="next-name">—</div>
-      <div id="countdown" class="countdown">--:--:--</div>
-      <div class="actions">
-        <button id="testBtn" class="btn">▶ Test Athan</button>
-        <button id="stopBtn" class="btn">■ Stop Audio</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <h3>Today's Prayers</h3>
-      <ul id="prayerList" class="prayer-list"></ul>
-    </section>
-
-    <section class="card">
-      <h3>Scheduled Audio Events</h3>
-      <ul id="specialList" class="special-list"></ul>
-      <p class="hint">Woduaa plays before each prayer, Duaa after each athan. Keep this tab open for audio to play on time.</p>
-      <details class="hint reliability-tips">
-        <summary>🔋 Athan not playing when the tab is in the background? Tips for reliability</summary>
-        <ul>
-          <li><strong>Keep the window visible</strong> (even small, at the side) rather than minimized — browsers suspend minimized windows most aggressively.</li>
-          <li><strong>Chrome / Edge:</strong> open <em>Settings → Performance</em> and add this site under “Always keep these sites active” so Memory Saver never puts the tab to sleep.</li>
-          <li><strong>Play the Quran podcast</strong> (the 🎙 playlist below) — a tab that is actively playing audio is kept awake by the browser, so listening to the Quran also keeps the athan schedule running.</li>
-          <li><strong>Install it as an app</strong> (browser menu → “Install” / “Add to Home Screen”) — an app window is treated better than a background tab.</li>
-          <li><strong>Keep the computer awake:</strong> a sleeping computer stops everything. On a Mac: System Settings → Lock Screen → prevent sleeping; on Windows: Power settings.</li>
-          <li>If the tab was suspended anyway, the app catches up when it wakes: recently missed athans (within 10 minutes) still play, older ones are listed in the Activity log.</li>
-        </ul>
-      </details>
-    </section>
-
-    <section class="card">
-      <h3>Podcast</h3>
-      <div id="podcastTitle" class="podcast-title"></div>
-      <div id="podcastSubtitle" class="podcast-subtitle"></div>
-      <div class="podcast-row">
-        <button id="podcastBtn" class="btn">🎙 Play Podcast</button>
-        <a class="podcast-link" href="https://open.spotify.com/show/5d4FhdBUAYt220XU5seoUy" target="_blank" rel="noopener">Open in Spotify ↗</a>
-        <a class="podcast-link" href="https://www.youtube.com/playlist?list=PL8475A8813886C6A5" target="_blank" rel="noopener">Open on YouTube ↗</a>
-      </div>
-      <div id="podcastPanel" class="podcast-panel">
-        <div id="podcastPlayerBox" class="podcast-player-box" style="display:none"><div id="podcastPlayer"></div></div>
-        <ol id="podcastList" class="podcast-list"></ol>
-        <p class="hint">The identical recordings as the Spotify show, from the YouTube playlist — all 114 surahs in Quran order, Al-Fatiha (1) to An-Nas (114), the inverse of Spotify's newest-first listing. Each surah plays in full and the next starts automatically.</p>
+      <div class="card">
+        <h3>Today's Prayers</h3>
+        <ul id="prayerList" class="prayer-list"></ul>
       </div>
     </section>
 
-    <section class="card">
-      <h3>Activity</h3>
-      <div id="statusLog" class="status-log"></div>
+    <section class="panel" id="panel-schedule">
+      <div class="card">
+        <h3>Scheduled Audio Events</h3>
+        <ul id="specialList" class="special-list"></ul>
+        <p class="hint">Woduaa plays before each prayer, Duaa after each athan. Keep this tab open for audio to play on time.</p>
+        <details class="hint reliability-tips">
+          <summary>🔋 Athan not playing when the tab is in the background? Tips for reliability</summary>
+          <ul>
+            <li><strong>Keep the window visible</strong> (even small, at the side) rather than minimized — browsers suspend minimized windows most aggressively.</li>
+            <li><strong>Chrome / Edge:</strong> open <em>Settings → Performance</em> and add this site under “Always keep these sites active” so Memory Saver never puts the tab to sleep.</li>
+            <li><strong>Play the Quran</strong> (the Quran tab) — a tab that is actively playing audio is kept awake by the browser, so listening to the Quran also keeps the athan schedule running.</li>
+            <li><strong>Install it as an app</strong> (browser menu → “Install” / “Add to Home Screen”) — an app window is treated better than a background tab.</li>
+            <li><strong>Keep the computer awake:</strong> a sleeping computer stops everything. On a Mac: System Settings → Lock Screen → prevent sleeping; on Windows: Power settings.</li>
+            <li>If the tab was suspended anyway, the app catches up when it wakes: recently missed athans (within 10 minutes) still play, older ones are listed in the Activity tab.</li>
+          </ul>
+        </details>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-quran">
+      <div class="card">
+        <h3>Quran — المصحف المرتل · الشيخ محمود علي البنا</h3>
+        <div class="player-bar">
+          <button class="pbtn small" id="prevBtn" title="Previous surah">⏮</button>
+          <button class="pbtn" id="playBtn" title="Play / pause">▶</button>
+          <button class="pbtn small" id="nextBtn" title="Next surah">⏭</button>
+          <div class="player-info">
+            <div class="pi-title" id="piTitle">اختر سورة من القائمة</div>
+            <div class="pi-sub" id="piSub">Audio player — full recordings, auto-advance</div>
+          </div>
+        </div>
+        <ol class="surah-list" id="surahList"></ol>
+        <p class="hint">All 114 surahs in Quran order — the identical recordings as the
+          <a href="https://open.spotify.com/show/5d4FhdBUAYt220XU5seoUy" target="_blank" rel="noopener">Spotify show</a>,
+          from the <a href="https://www.youtube.com/playlist?list=PL8475A8813886C6A5" target="_blank" rel="noopener">YouTube playlist</a>.
+          YouTube's rules require its player to stay visible, so it lives as a small corner thumbnail — tap it to enlarge.
+          The athan always takes priority: the Quran pauses automatically when prayer audio starts.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-activity">
+      <div class="card">
+        <h3>Activity</h3>
+        <div id="statusLog" class="status-log"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-settings">
+      <div class="card">
+        <h3>Settings</h3>
+        <div class="settings-body">
+          <h4>Theme</h4>
+          <div class="theme-grid">
+            <label class="theme-opt"><input type="radio" name="theme" value="lake" /> 🏞 Lake<span>Real photo, living light</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="ridges" /> 🏔 Ridges<span>Layered art mountains</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="mosque" /> 🕌 Mosque<span>Silhouette skyline</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="classic" /> 🌌 Classic<span>Plain dark</span></label>
+          </div>
+
+          <h4>Prayers</h4>
+          <label><input type="checkbox" id="en_fajr" /> Fajr</label>
+          <label><input type="checkbox" id="en_dhuhr" /> Dhuhr</label>
+          <label><input type="checkbox" id="en_asr" /> Asr</label>
+          <label><input type="checkbox" id="en_maghrib" /> Maghrib</label>
+          <label><input type="checkbox" id="en_isha" /> Isha</label>
+
+          <h4>Calculation Method</h4>
+          <select id="calcMethod"></select>
+
+          <h4>Athan Volume</h4>
+          <input type="range" id="athanVolume" min="0" max="1" step="0.05" />
+
+          <h4>Special Audio</h4>
+          <div class="special-setting">
+            <label><input type="checkbox" id="sp_pre_prayer_woduaa" /> Woduaa before each prayer</label>
+            <div class="inline">Lead <input type="number" id="woduaaLead" min="1" max="120" /> min ·
+              Vol <input type="range" id="vol_pre_prayer_woduaa" min="0" max="1" step="0.05" /></div>
+          </div>
+          <div class="special-setting">
+            <label><input type="checkbox" id="sp_after_prayer_duaa" /> Duaa after each athan</label>
+            <div class="inline">Vol <input type="range" id="vol_after_prayer_duaa" min="0" max="1" step="0.05" /></div>
+          </div>
+          <div class="special-setting">
+            <label><input type="checkbox" id="sp_friday_before_dhuhr" /> Surat Al-Kahf on Friday</label>
+            <div class="inline">Vol <input type="range" id="vol_friday_before_dhuhr" min="0" max="1" step="0.05" /></div>
+          </div>
+          <div class="special-setting">
+            <label><input type="checkbox" id="sp_morning_audio" /> Morning Azkar</label>
+            <div class="inline">Vol <input type="range" id="vol_morning_audio" min="0" max="1" step="0.05" /></div>
+          </div>
+          <div class="special-setting">
+            <label><input type="checkbox" id="sp_night_audio" /> Night Azkar</label>
+            <div class="inline">Vol <input type="range" id="vol_night_audio" min="0" max="1" step="0.05" /></div>
+          </div>
+
+          <h4>Location</h4>
+          <label><input type="checkbox" id="autoDetect" /> Auto-detect my location</label>
+          <div class="inline">
+            Lat <input type="number" id="manualLat" step="0.0001" />
+            Lon <input type="number" id="manualLon" step="0.0001" />
+          </div>
+
+          <h4>Notifications</h4>
+          <label><input type="checkbox" id="showNotifs" /> Show browser notifications</label>
+
+          <div class="settings-actions">
+            <button id="saveSettings" class="btn primary">Save</button>
+            <button id="resetSettings" class="btn">Reset to defaults</button>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -104,66 +189,10 @@
     <span id="nowPlayingText"></span>
   </div>
 
-  <!-- Settings panel -->
-  <aside id="settingsPanel" class="settings-panel">
-    <div class="settings-header">
-      <h2>Settings</h2>
-      <button id="closeSettings" class="btn icon">✕</button>
-    </div>
-
-    <div class="settings-body">
-      <h4>Prayers</h4>
-      <label><input type="checkbox" id="en_fajr" /> Fajr</label>
-      <label><input type="checkbox" id="en_dhuhr" /> Dhuhr</label>
-      <label><input type="checkbox" id="en_asr" /> Asr</label>
-      <label><input type="checkbox" id="en_maghrib" /> Maghrib</label>
-      <label><input type="checkbox" id="en_isha" /> Isha</label>
-
-      <h4>Calculation Method</h4>
-      <select id="calcMethod"></select>
-
-      <h4>Athan Volume</h4>
-      <input type="range" id="athanVolume" min="0" max="1" step="0.05" />
-
-      <h4>Special Audio</h4>
-      <div class="special-setting">
-        <label><input type="checkbox" id="sp_pre_prayer_woduaa" /> Woduaa before each prayer</label>
-        <div class="inline">Lead <input type="number" id="woduaaLead" min="1" max="120" /> min ·
-          Vol <input type="range" id="vol_pre_prayer_woduaa" min="0" max="1" step="0.05" /></div>
-      </div>
-      <div class="special-setting">
-        <label><input type="checkbox" id="sp_after_prayer_duaa" /> Duaa after each athan</label>
-        <div class="inline">Vol <input type="range" id="vol_after_prayer_duaa" min="0" max="1" step="0.05" /></div>
-      </div>
-      <div class="special-setting">
-        <label><input type="checkbox" id="sp_friday_before_dhuhr" /> Surat Al-Kahf on Friday</label>
-        <div class="inline">Vol <input type="range" id="vol_friday_before_dhuhr" min="0" max="1" step="0.05" /></div>
-      </div>
-      <div class="special-setting">
-        <label><input type="checkbox" id="sp_morning_audio" /> Morning Azkar</label>
-        <div class="inline">Vol <input type="range" id="vol_morning_audio" min="0" max="1" step="0.05" /></div>
-      </div>
-      <div class="special-setting">
-        <label><input type="checkbox" id="sp_night_audio" /> Night Azkar</label>
-        <div class="inline">Vol <input type="range" id="vol_night_audio" min="0" max="1" step="0.05" /></div>
-      </div>
-
-      <h4>Location</h4>
-      <label><input type="checkbox" id="autoDetect" /> Auto-detect my location</label>
-      <div class="inline">
-        Lat <input type="number" id="manualLat" step="0.0001" />
-        Lon <input type="number" id="manualLon" step="0.0001" />
-      </div>
-
-      <h4>Notifications</h4>
-      <label><input type="checkbox" id="showNotifs" /> Show browser notifications</label>
-
-      <div class="settings-actions">
-        <button id="saveSettings" class="btn primary">Save</button>
-        <button id="resetSettings" class="btn">Reset to defaults</button>
-      </div>
-    </div>
-  </aside>
+  <div id="ytThumb">
+    <div id="ytPlayerHost"></div>
+    <div class="yt-note">YouTube player (required to stay visible) — tap to enlarge</div>
+  </div>
 
   <footer>
     Prayer times by <a href="https://aladhan.com/prayer-times-api" target="_blank" rel="noopener">Aladhan API</a> ·
@@ -174,6 +203,7 @@
   <script src="js/location.js"></script>
   <script src="js/prayer-times.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/scene.js"></script>
   <script src="js/podcast.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/app.js"></script>

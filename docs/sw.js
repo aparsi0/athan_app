@@ -3,7 +3,7 @@
  * and caches audio files the first time they play.
  * Bump CACHE_VERSION when deploying changes to force clients to update.
  */
-const CACHE_VERSION = 'athan-web-v6';
+const CACHE_VERSION = 'athan-web-v7';
 const APP_SHELL = [
   '.',
   'index.html',
@@ -12,11 +12,14 @@ const APP_SHELL = [
   'js/location.js',
   'js/prayer-times.js',
   'js/audio.js',
+  'js/scene.js',
   'js/podcast.js',
   'js/scheduler.js',
   'js/app.js',
   'manifest.webmanifest',
-  'assets/icons/icon.svg'
+  'assets/icons/icon.svg',
+  'assets/ridge.json',
+  'assets/terrain.png'
 ];
 
 self.addEventListener('install', (event) => {

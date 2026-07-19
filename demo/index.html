@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Athan Web — Sky Demo</title>
+<style>
+:root {
+  --gold: #d4af37;
+  --gold-soft: #e8c96a;
+  --text: #eaf2f9;
+  --muted: rgba(234, 242, 249, 0.7);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  overflow-x: hidden;
+  background: #04060f;
+}
+
+/* One canvas renders the whole living scene:
+   sky → stars → sun/moon (+their light) → layered ridges (occlusion). */
+#scene { position: fixed; inset: 0; z-index: -3; width: 100vw; height: 100vh; display: block; }
+
+/* ============ BRAND + TABS ============ */
+header { text-align: center; padding: 34px 16px 0; }
+.brand-mark {
+  width: 74px; height: 74px; margin: 0 auto;
+  border: 1px solid rgba(255,255,255,0.6); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; color: var(--gold);
+  background: rgba(5,10,20,0.3); backdrop-filter: blur(3px);
+}
+.brand-stem { width: 1px; height: 26px; background: rgba(255,255,255,0.55); margin: 0 auto; }
+.brand-rule { width: min(420px, 80vw); height: 1px; background: rgba(255,255,255,0.55); margin: 0 auto; }
+h1.site-title { font-size: 30px; font-weight: 700; letter-spacing: 10px; margin: 22px 0 8px; text-shadow: 0 2px 20px rgba(0,0,0,0.7); }
+.site-sub { font-size: 11.5px; letter-spacing: 4px; color: var(--muted); text-transform: uppercase; margin-bottom: 22px; text-shadow: 0 1px 10px rgba(0,0,0,0.55); }
+nav.tabs { display: flex; justify-content: center; flex-wrap: wrap; margin: 26px auto 0; max-width: 720px; }
+nav.tabs button {
+  font: inherit; font-size: 11.5px; letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--text);
+  background: rgba(5,10,20,0.35); border: 1px solid rgba(255,255,255,0.6);
+  padding: 13px 22px; margin: 0 -0.5px; cursor: pointer;
+  backdrop-filter: blur(4px); transition: background 0.2s;
+}
+nav.tabs button:first-child { border-radius: 6px 0 0 6px; }
+nav.tabs button:last-child { border-radius: 0 6px 6px 0; }
+nav.tabs button:hover { background: rgba(212,175,55,0.3); }
+nav.tabs button.active { background: rgba(212,175,55,0.9); color: #141002; font-weight: 700; border-color: var(--gold); }
+
+/* ============ PANELS ============ */
+main { max-width: 700px; margin: 40px auto 150px; padding: 0 16px; }
+.panel { display: none; }
+.panel.active { display: block; animation: fadein 0.35s; }
+@keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+.card {
+  background: rgba(8,16,30,0.55);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 14px; padding: 22px; margin-bottom: 16px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 34px rgba(0,0,0,0.38);
+}
+.card h3 { font-size: 12.5px; text-transform: uppercase; letter-spacing: 2px; color: var(--gold-soft); margin-bottom: 14px; }
+.hero { text-align: center; padding: 26px 18px; }
+.hero .loc { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+.hero .phase-name { color: var(--gold-soft); font-size: 13px; letter-spacing: 1px; margin-bottom: 14px; }
+.next-label { font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); }
+.next-name { font-size: 30px; font-weight: 700; margin: 6px 0 2px; }
+.countdown { font-size: 44px; font-weight: 300; color: var(--gold); font-variant-numeric: tabular-nums; text-shadow: 0 0 22px rgba(212,175,55,0.4); }
+ul.prayers { list-style: none; }
+ul.prayers li { display: flex; align-items: center; gap: 12px; padding: 11px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+ul.prayers li:last-child { border-bottom: none; }
+ul.prayers li.next { background: rgba(212,175,55,0.14); outline: 1px solid rgba(212,175,55,0.4); border-radius: 10px; }
+ul.prayers .ar { color: var(--gold-soft); min-width: 66px; font-size: 17px; }
+ul.prayers .en { flex: 1; }
+ul.prayers .tm { font-variant-numeric: tabular-nums; }
+.placeholder { color: var(--muted); font-size: 14px; line-height: 1.7; }
+
+/* ============ QURAN: audio-style player ============ */
+.player-bar {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(212,175,55,0.12);
+  border: 1px solid rgba(212,175,55,0.4);
+  border-radius: 12px; padding: 12px 16px; margin-bottom: 14px;
+}
+.player-bar .pbtn {
+  font: inherit; font-size: 18px; line-height: 1;
+  background: var(--gold); color: #141002; border: none;
+  width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.player-bar .pbtn.small { width: 34px; height: 34px; font-size: 13px; background: rgba(255,255,255,0.16); color: var(--text); }
+.player-info { flex: 1; min-width: 0; }
+.player-info .pi-title { font-size: 16px; direction: rtl; text-align: right; color: var(--gold-soft); }
+.player-info .pi-sub { font-size: 11.5px; color: var(--muted); text-align: right; }
+#ytThumb {
+  position: fixed; right: 12px; bottom: 108px; z-index: 9;
+  width: 178px; border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.3);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.5);
+  transition: width 0.25s; display: none;
+}
+#ytThumb.expanded { width: min(480px, 92vw); }
+#ytThumb .yt-note { background: rgba(6,12,24,0.92); color: var(--muted); font-size: 9.5px; padding: 4px 8px; text-align: center; cursor: pointer; }
+#ytThumb iframe { display: block; width: 100%; aspect-ratio: 16/9; border: 0; }
+ol.surah-list { list-style: none; max-height: 300px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; background: rgba(0,0,0,0.18); }
+ol.surah-list li { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); }
+ol.surah-list li:hover { background: rgba(212,175,55,0.1); }
+ol.surah-list li.playing { background: rgba(212,175,55,0.16); }
+ol.surah-list li.playing .sname { color: var(--gold); }
+.snum { min-width: 30px; text-align: center; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.sname { flex: 1; font-size: 16px; direction: rtl; text-align: right; }
+
+/* ============ DEMO CONTROLS ============ */
+.demo-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px;
+  width: min(680px, calc(100vw - 24px));
+  background: rgba(6,12,24,0.85);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 14px; padding: 12px 18px; z-index: 10; backdrop-filter: blur(10px);
+}
+.demo-bar .row { display: flex; align-items: center; gap: 12px; }
+.demo-bar label { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold-soft); white-space: nowrap; }
+.demo-bar input[type=range] { flex: 1; accent-color: var(--gold); }
+.demo-bar .time-readout { font-variant-numeric: tabular-nums; font-size: 14px; min-width: 76px; text-align: right; }
+.demo-bar button { font: inherit; font-size: 12px; background: rgba(212,175,55,0.9); color: #141002; font-weight: 700; border: none; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+.demo-note { font-size: 10.5px; color: var(--muted); margin-top: 6px; text-align: center; }
+.demo-badge { position: fixed; top: 12px; right: 12px; z-index: 10; background: rgba(212,175,55,0.92); color: #141002; font-size: 11px; font-weight: 800; letter-spacing: 2px; padding: 6px 12px; border-radius: 20px; }
+@media (max-width: 520px) {
+  h1.site-title { font-size: 22px; letter-spacing: 6px; }
+  nav.tabs button { padding: 11px 12px; font-size: 10.5px; }
+  .countdown { font-size: 36px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div class="demo-badge">DEMO</div>
+
+<header>
+  <div class="brand-mark">☪</div>
+  <div class="brand-stem"></div>
+  <div class="brand-rule"></div>
+  <h1 class="site-title">ATHAN WEB</h1>
+  <div class="site-sub">Prayer times from your own sky</div>
+  <div class="brand-rule"></div>
+  <div class="brand-stem"></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="athan" class="active">Athan</button>
+    <button data-tab="schedule">Schedule</button>
+    <button data-tab="quran">Quran</button>
+    <button data-tab="activity">Activity</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+</header>
+
+<main>
+  <section class="panel active" id="panel-athan">
+    <div class="card hero">
+      <div class="loc" id="locText">Detecting location…</div>
+      <div class="phase-name" id="phaseText"></div>
+      <div class="next-label">Next prayer</div>
+      <div class="next-name" id="nextName">—</div>
+      <div class="countdown" id="countdown">--:--:--</div>
+    </div>
+    <div class="card">
+      <h3>Today's Prayers</h3>
+      <ul class="prayers" id="prayerList"></ul>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-schedule">
+    <div class="card"><h3>Scheduled Audio Events</h3>
+      <p class="placeholder">In the real version this tab holds the full schedule you already have: Woduaa before each prayer, Duaa after each athan, Friday Surat Al-Kahf, Morning &amp; Night Azkar — unchanged, just moved into its own tab.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-quran">
+    <div class="card">
+      <h3>Quran — المصحف المرتل · الشيخ محمود علي البنا</h3>
+      <div class="player-bar">
+        <button class="pbtn small" id="prevBtn" title="Previous surah">⏮</button>
+        <button class="pbtn" id="playBtn" title="Play / pause">▶</button>
+        <button class="pbtn small" id="nextBtn" title="Next surah">⏭</button>
+        <div class="player-info">
+          <div class="pi-title" id="piTitle">اختر سورة من القائمة</div>
+          <div class="pi-sub" id="piSub">Audio player — full recordings, auto-advance</div>
+        </div>
+      </div>
+      <ol class="surah-list" id="surahList"></ol>
+      <p class="placeholder" style="margin-top:10px; font-size:12px">
+        Plays like a pure audio player. YouTube's rules require its player to stay visible,
+        so it lives as a small corner thumbnail (bottom-right) — tap it to enlarge, tap again to shrink.
+      </p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-activity">
+    <div class="card"><h3>Activity</h3><p class="placeholder">The live activity log — unchanged, in its own tab.</p></div>
+  </section>
+  <section class="panel" id="panel-settings">
+    <div class="card"><h3>Settings</h3><p class="placeholder">The full settings panel — unchanged, in its own tab.</p></div>
+  </section>
+</main>
+
+<div id="ytThumb">
+  <div id="ytPlayerHost"></div>
+  <div class="yt-note" id="ytNote">YouTube player (required to stay visible) — tap to enlarge</div>
+</div>
+
+<div class="demo-bar">
+  <div class="row">
+    <label>Preview the day</label>
+    <input type="range" id="timeSlider" min="0" max="1439" step="1" />
+    <span class="time-readout" id="timeReadout"></span>
+    <button id="nowBtn">Now</button>
+  </div>
+  <div class="demo-note">Demo control only — drag to see the scene at any moment. The real site follows the actual clock &amp; your real sun times.</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = {
+  times: { fajr: 285, sunrise: 370, dhuhr: 801, asr: 1030, maghrib: 1231, isha: 1316 },
+  overrideMinutes: null,
+  loc: 'Raleigh, NC (fallback)'
+};
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+function rgbOf(h) { return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+function mixC(h1, h2, t) {
+  const a = rgbOf(h1), b = rgbOf(h2);
+  return `rgb(${Math.round(lerp(a[0],b[0],t))},${Math.round(lerp(a[1],b[1],t))},${Math.round(lerp(a[2],b[2],t))})`;
+}
+function mixHex(h1, h2, t) {
+  const a = rgbOf(h1), b = rgbOf(h2);
+  const c = [0,1,2].map(i => Math.round(lerp(a[i],b[i],t)));
+  return '#' + c.map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+/* ---------- palette keyframes tied to the REAL sun times ----------
+   [minute, skyTop, skyMid, horizon, ambient 0..1, phase] */
+function anchors() {
+  const T = state.times, mid = (a, b) => (a + b) / 2;
+  return [
+    [T.fajr - 90,            '#040711', '#070c1a', '#0b1326', 0.16, 'Deep night'],
+    [T.fajr,                 '#0a1228', '#161f3c', '#3c3a58', 0.26, 'Fajr — first light'],
+    [mid(T.fajr, T.sunrise), '#152048', '#333a6e', '#b06a4e', 0.42, 'Dawn'],
+    [T.sunrise,              '#2b4a7c', '#7a7ba9', '#f5a55c', 0.60, 'Sunrise'],
+    [T.sunrise + 50,         '#4a7ab8', '#8bacd2', '#f7cc90', 0.82, 'Morning'],
+    [T.dhuhr,                '#3f88d5', '#79b5e8', '#d3e8f8', 1.00, 'Midday — Dhuhr'],
+    [T.asr,                  '#3d7ec8', '#83b1e1', '#ead9a9', 0.93, 'Afternoon — Asr'],
+    [T.maghrib - 50,         '#3a62a2', '#9c88a2', '#f5ad62', 0.76, 'Golden hour'],
+    [T.maghrib,              '#253560', '#7c5a7a', '#ee6f3c', 0.52, 'Sunset — Maghrib'],
+    [mid(T.maghrib, T.isha), '#101a3a', '#343060', '#7c465e', 0.36, 'Dusk'],
+    [T.isha,                 '#070c1e', '#101632', '#1e2446', 0.24, 'Isha — night falls'],
+    [T.isha + 80,            '#040711', '#070c1a', '#0b1326', 0.16, 'Night']
+  ];
+}
+function paletteAt(minute) {
+  const A = anchors(), DAY = 1440;
+  let m = minute;
+  if (m < A[0][0]) m += DAY;
+  let i = 0;
+  while (i < A.length - 1 && m >= A[i + 1][0]) i++;
+  if (i >= A.length - 1) i = A.length - 2;
+  const t = clamp((m - A[i][0]) / Math.max(1, A[i + 1][0] - A[i][0]), 0, 1);
+  const P = A[i], Q = A[i + 1];
+  return {
+    top: mixHex(P[1], Q[1], t), mid: mixHex(P[2], Q[2], t), hor: mixHex(P[3], Q[3], t),
+    amb: lerp(P[4], Q[4], t),
+    phase: t < 0.5 ? P[5] : Q[5]
+  };
+}
+
+/* ---------- real-photo living landscape (macOS dynamic-wallpaper style) ----------
+   assets/terrain.png is a real lake-and-forest photograph whose sky has been
+   cut out (transparent), so OUR sky — gradients, stars, sun, moon — renders
+   BEHIND the real treeline and everything celestial rises/sets behind it.
+   assets/ridge.json holds the treeline height profile (128 samples). */
+const canvas = $('scene');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+const terrainImg = new Image();
+terrainImg.src = 'assets/terrain.png';
+terrainImg.onload = () => renderScene(nowMinutes());
+let RIDGE = null, RIDGE_MAX = 0.4;
+fetch('assets/ridge.json').then(r => r.json()).then(d => {
+  RIDGE = d; RIDGE_MAX = Math.max(...d);
+  renderScene(nowMinutes());
+}).catch(() => {});
+
+const off = document.createElement('canvas');
+const octx = off.getContext('2d');
+
+/* cover-fit placement of the terrain photo, anchored to the bottom */
+function terrainBox() {
+  const iw = terrainImg.naturalWidth || 1800, ih = terrainImg.naturalHeight || 1352;
+  const s = Math.max(W / iw, H / ih);
+  const dw = iw * s, dh = ih * s;
+  return { dx: (W - dw) / 2, dy: H - dh, dw, dh };
+}
+function ridgeYat(fx, box) {
+  if (!RIDGE) return H * 0.6;
+  // account for horizontal crop of the cover-fit
+  const imgFx = clamp((fx * W - box.dx) / box.dw, 0, 1);
+  return box.dy + RIDGE[clamp(Math.round(imgFx * 127), 0, 127)] * box.dh;
+}
+
+/* stars: fixed field, drawn only when dark, occluded by ridges drawn later */
+let STARS = [];
+function makeStars() {
+  let seed = 42;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  STARS = Array.from({ length: 170 }, () => ({
+    x: rnd(), y: rnd() * 0.62, r: rnd() * 1.2 + 0.25, tw: rnd() * 6.28, a: rnd() * 0.6 + 0.4
+  }));
+}
+makeStars();
+
+function renderScene(minute) {
+  const pal = paletteAt(minute);
+  const T = state.times;
+  let sunInfo = null, moonInfo = null;
+  ctx.clearRect(0, 0, W, H);
+
+  /* 1 — sky */
+  const sky = ctx.createLinearGradient(0, 0, 0, H * 0.9);
+  sky.addColorStop(0, pal.top);
+  sky.addColorStop(0.55, pal.mid);
+  sky.addColorStop(1, pal.hor);
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  /* 2 — stars (behind mountains; fade with ambient light) */
+  const starA = clamp((0.38 - pal.amb) / 0.22, 0, 1);
+  if (starA > 0) {
+    for (const s of STARS) {
+      const tw = 0.75 + 0.25 * Math.sin(minute * 0.5 + s.tw);
+      ctx.globalAlpha = starA * s.a * tw;
+      ctx.fillStyle = '#e9eeff';
+      ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* 3 — sun & moon: the arc's ends dip below the real treeline, so they
+        visibly rise from and set behind the forest */
+  const box = terrainBox();
+  const horizonY = (RIDGE ? box.dy + RIDGE_MAX * box.dh : H * 0.6) + H * 0.06;
+  const peakY = Math.min(H * 0.24, horizonY - H * 0.3);
+  const arc = (frac) => [lerp(W * 0.07, W * 0.93, frac), horizonY - Math.sin(Math.PI * frac) * (horizonY - peakY)];
+
+  const sunSpan = T.maghrib - T.sunrise;
+  if (minute >= T.sunrise - 40 && minute <= T.maghrib + 40) {
+    const frac = (minute - T.sunrise) / sunSpan;
+    const [sx, sy] = arc(clamp(frac, -0.06, 1.06));
+    const alt = Math.sin(Math.PI * clamp(frac, 0, 1));           // 0 horizon → 1 zenith
+    const warm = 1 - alt;                                        // warmer near horizon
+    /* near the horizon the sun is a dramatic warm bloom; high in the sky it
+       becomes subtle ambient glare (matches real perception, and keeps the
+       halo from washing out the page header at midday) */
+    const glowC1 = mixC('#fff3d8', '#ffb765', warm);
+    const glowR = H * (0.14 + 0.38 * warm);
+    ctx.globalCompositeOperation = 'lighter';
+    const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowR);
+    glow.addColorStop(0, glowC1.replace('rgb', 'rgba').replace(')', `,${0.18 + 0.5 * warm})`));
+    glow.addColorStop(0.4, glowC1.replace('rgb', 'rgba').replace(')', `,${0.06 + 0.12 * warm})`));
+    glow.addColorStop(1, 'rgba(255,200,120,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+    /* disc */
+    const r = H * (0.016 + 0.010 * warm);
+    ctx.fillStyle = mixC('#fffbef', '#ffd27a', warm);
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
+    sunInfo = { sx, sy, warm };
+  }
+
+  const nightLen = (T.fajr + 1440 - T.isha) % 1440;
+  let nf = null;
+  if (minute >= T.isha + 20) nf = (minute - T.isha - 20) / (nightLen + 40);
+  else if (minute <= T.fajr + 20) nf = (minute + 1440 - T.isha - 20) / (nightLen + 40);
+  if (nf != null && starA > 0.05) {
+    const [mx, my] = arc(clamp(nf, 0, 1));
+    ctx.globalCompositeOperation = 'lighter';
+    const mg = ctx.createRadialGradient(mx, my, 0, mx, my, H * 0.16);
+    mg.addColorStop(0, 'rgba(205,216,255,0.35)');
+    mg.addColorStop(1, 'rgba(205,216,255,0)');
+    ctx.fillStyle = mg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+    /* crescent drawn on its own sprite so the cut-out never erases the sky */
+    const mr = H * 0.015;
+    const spr = document.createElement('canvas');
+    spr.width = spr.height = Math.ceil(mr * 2.4);
+    const sctx = spr.getContext('2d');
+    const c = spr.width / 2;
+    sctx.fillStyle = '#f2f3ea';
+    sctx.beginPath(); sctx.arc(c, c, mr, 0, 7); sctx.fill();
+    sctx.globalCompositeOperation = 'destination-out';
+    sctx.beginPath(); sctx.arc(c + mr * 0.45, c - mr * 0.28, mr * 0.86, 0, 7); sctx.fill();
+    ctx.drawImage(spr, mx - c, my - c);
+    moonInfo = { mx, my };
+  }
+
+  /* 4 — the real photographic terrain, graded for the time of day.
+        Drawn last → it occludes sun, moon and stars. */
+  if (terrainImg.complete && terrainImg.naturalWidth) {
+    const dayness = clamp((pal.amb - 0.16) / 0.84, 0, 1);
+    octx.clearRect(0, 0, W, H);
+    octx.filter = `brightness(${(0.36 + 0.72 * dayness).toFixed(3)}) saturate(${(0.55 + 0.55 * dayness).toFixed(3)})`;
+    octx.drawImage(terrainImg, box.dx, box.dy, box.dw, box.dh);
+    octx.filter = 'none';
+
+    /* tint only the terrain pixels (offscreen canvas keeps the alpha) */
+    octx.globalCompositeOperation = 'source-atop';
+    /* cool blue cast at night */
+    octx.fillStyle = `rgba(16,26,58,${(0.45 * (1 - dayness)).toFixed(3)})`;
+    octx.fillRect(0, 0, W, H);
+    /* warm cast + light on the water near sunrise/sunset */
+    if (sunInfo && sunInfo.warm > 0.15) {
+      const wa = sunInfo.warm;
+      octx.fillStyle = `rgba(255,150,70,${(0.14 * wa).toFixed(3)})`;
+      octx.fillRect(0, 0, W, H);
+      const ry = ridgeYat(sunInfo.sx / W, box);
+      const wg = octx.createRadialGradient(sunInfo.sx, ry, 0, sunInfo.sx, ry, H * 0.5);
+      wg.addColorStop(0, `rgba(255,180,90,${(0.34 * wa).toFixed(3)})`);
+      wg.addColorStop(1, 'rgba(255,180,90,0)');
+      octx.fillStyle = wg;
+      octx.fillRect(0, ry - H * 0.02, W, H);
+    }
+    /* moonlight shimmer on the lake at night */
+    if (moonInfo) {
+      const ry = ridgeYat(moonInfo.mx / W, box);
+      const mgw = octx.createRadialGradient(moonInfo.mx, ry, 0, moonInfo.mx, ry, H * 0.4);
+      mgw.addColorStop(0, 'rgba(200,215,255,0.20)');
+      mgw.addColorStop(1, 'rgba(200,215,255,0)');
+      octx.fillStyle = mgw;
+      octx.fillRect(0, ry - H * 0.02, W, H);
+    }
+    octx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(off, 0, 0, W, H);
+  }
+
+  $('phaseText').textContent = pal.phase;
+}
+
+function sizeCanvas() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = innerWidth; H = innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  off.width = W * DPR; off.height = H * DPR;
+  octx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+sizeCanvas();
+
+/* ============ live times ============ */
+const PRAYERS = [
+  ['fajr','الفجر','Fajr'], ['sunrise','الشروق','Sunrise'], ['dhuhr','الظهر','Dhuhr'],
+  ['asr','العصر','Asr'], ['maghrib','المغرب','Maghrib'], ['isha','العشاء','Isha']
+];
+const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h*60+m; };
+const fmt12 = (mins) => {
+  mins = ((mins % 1440) + 1440) % 1440;
+  const h24 = Math.floor(mins/60), m = Math.round(mins%60), h = ((h24+11)%12)+1;
+  return `${h}:${String(m).padStart(2,'0')} ${h24 < 12 ? 'AM' : 'PM'}`;
+};
+async function loadTimes() {
+  try {
+    let lat = 35.78, lon = -78.64;
+    try {
+      const ip = await (await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(6000) })).json();
+      if (ip && ip.latitude != null) { lat = ip.latitude; lon = ip.longitude; state.loc = `${ip.city||''}${ip.region_code?', '+ip.region_code:''}`; }
+    } catch {}
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const dd = new Date(), ds = `${String(dd.getDate()).padStart(2,'0')}-${String(dd.getMonth()+1).padStart(2,'0')}-${dd.getFullYear()}`;
+    const r = await (await fetch(`https://api.aladhan.com/v1/timings/${ds}?latitude=${lat}&longitude=${lon}&method=2&timezone=${tz}`, { signal: AbortSignal.timeout(9000) })).json();
+    const tm = r.data.timings, clean = (x) => x.split(' ')[0];
+    for (const [k, K] of [['fajr','Fajr'],['sunrise','Sunrise'],['dhuhr','Dhuhr'],['asr','Asr'],['maghrib','Maghrib'],['isha','Isha']]) {
+      state.times[k] = toMin(clean(tm[K]));
+    }
+  } catch (e) { console.warn('using fallback times', e); }
+  $('locText').textContent = state.loc || 'Your location';
+  renderPrayers();
+}
+function nowMinutes() {
+  if (state.overrideMinutes != null) return state.overrideMinutes;
+  const d = new Date();
+  return d.getHours()*60 + d.getMinutes() + d.getSeconds()/60;
+}
+function renderPrayers() {
+  const list = $('prayerList');
+  list.innerHTML = '';
+  const cur = nowMinutes();
+  let next = null;
+  for (const [key] of PRAYERS) {
+    if (key === 'sunrise') continue;
+    if (state.times[key] > cur) { next = key; break; }
+  }
+  for (const [key, ar, en] of PRAYERS) {
+    const li = document.createElement('li');
+    if (key === next) li.className = 'next';
+    li.innerHTML = `<span class="ar">${ar}</span><span class="en">${en}</span><span class="tm">${fmt12(state.times[key])}</span>`;
+    list.appendChild(li);
+  }
+  const np = next ? PRAYERS.find(p => p[0] === next) : null;
+  $('nextName').textContent = np ? `${np[1]} · ${np[2]}` : 'الفجر · Fajr (tomorrow)';
+  const target = next ? state.times[next] : state.times.fajr + 1440;
+  const diff = Math.max(0, (target - cur) * 60);
+  const h = Math.floor(diff/3600), m = Math.floor(diff%3600/60), s = Math.floor(diff%60);
+  $('countdown').textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+/* ============ QURAN: audio-style player over a minimized YouTube player ============ */
+const SURAHS = ['الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال','التوبة','يونس','هود','يوسف','الرعد','إبراهيم','الحجر','النحل','الإسراء','الكهف','مريم','طه','الأنبياء','الحج','المؤمنون','النور','الفرقان','الشعراء','النمل','القصص','العنكبوت','الروم','لقمان','السجدة','الأحزاب','سبأ','فاطر','يس','الصافات','ص','الزمر','غافر','فصلت','الشورى','الزخرف','الدخان','الجاثية','الأحقاف','محمد','الفتح','الحجرات','ق','الذاريات','الطور','النجم','القمر','الرحمن','الواقعة','الحديد','المجادلة','الحشر','الممتحنة','الصف','الجمعة','المنافقون','التغابن','الطلاق','التحريم','الملك','القلم','الحاقة','المعارج','نوح','الجن','المزمل','المدثر','القيامة','الإنسان','المرسلات','النبأ','النازعات','عبس','التكوير','الانفطار','المطففين','الانشقاق','البروج','الطارق','الأعلى','الغاشية','الفجر','البلد','الشمس','الليل','الضحى','الشرح','التين','العلق','القدر','البينة','الزلزلة','العاديات','القارعة','التكاثر','العصر','الهمزة','الفيل','قريش','الماعون','الكوثر','الكافرون','النصر','المسد','الإخلاص','الفلق','الناس'];
+const VIDEO_IDS = ['PDNxisGeW1c','n4POhvaC2ws','Qlq6fKG2L48','0TbNuYZXEFM','-yqEU5iGzRc','EmP2aIMk23U','rPp5xJVeguo','JwCMdyjGEek','TOs4bxGC1RI','-FBpwMHLJjo','jOp6XWEbQOc','UrfZzWuD5oA','9D4afDgTXTQ','60xrw5xP5Gc','OxQMlURn3qE','loctyVUJlnM','dqeI29oH2SI','MrKtfra1GdE','gbkQJ_YRXtQ','UF9HYWKTH20','KhzTu4TqlsA','DTJPEiYKn_8','hvogfFpzfss','CjtEU4mgY5g','Kf9oHLc8Ow8','WfxeQTljhOM','bEaKPB9wJB4','BHRUHc9ceIs','lDZz3WWG7uk','E81U5BORdRY','wg5R0OKfcmY','yryPuRX0LA8','Spk5iTyka3s','_tyhdjxA5aQ','sbnFzKh-BDk','VCZkoCb2U1s','ls0iLFrBINo','DbX7oUTjRak','DwSYcJKN7Iw','gzo5qAwUqus','Lnstc9EzGf4','-sGCWeMV2gk','OG6iVYFX1jI','EdVC1DZpL1c','q0PTLRorVMk','eOalQ-hUuOU','UgWbHH7wcMg','9Rx6cWdUcLI','QfDUzHJKtjE','prADpCHLv_4','6Xi-TBRl1HY','f4tRUA6K1OQ','mnAfJ7sDXx4','X-5Yy0d_Y5o','rGdWGQvAmdo','hRMRK6rebuU','OK4B_4jRL8c','lw0hR6OLjRA','OQzGVHGWP-Y','9vltXa4pnoE','CAcAEMQZe_8','_WoH7OVgqGQ','gCH59cgEJEw','K2azv4hmMqc','MSSbwG5MqKk','yDdHYCbWZMU','9KralHHjcl8','t3mr7iTQYEg','bxsIOGBgB1c','xfiFkTd_QnI','4wooeJxyQ-k','t8-Q-DFX0vQ','YI25XiTryKQ','Rymb-hcJqw8','bzIPVB4VUWQ','Q0JD06MsUzo','CWTmCFA5G0A','G25igasmzPo','ZbCFAGmBgZI','CUzwEyxouPI','_k2HK-gBXAQ','9RcfnX5n_70','TKa3SKE-iQg','CUl3tWbEAhw','poz_EJvxQ14','lwWTuR3Q04w','HSYy9crpNGg','nUPm5d2QKIc','7FthaIXP9NQ','rX9Dwx2KUd8','vd-TPhgkBbY','tkhlUH-tG_A','OCW-7OaR8go','HFN27o7VW2Q','uJJjpPj607U','Yw_N_33z9Ik','aS5PIu00qqg','PMmZr3TKEWY','OOjh9VlR4bI','0hOam_cSiUo','7gLDkN-q2P8','lkZFbP2mOVM','2pHj4HPs1zI','OgMf2_ygNkk','k9p4c5DB3Vo','EqSlJMmrLiY','4jJ0HXtn-Yw','FtDyMi9oeXk','cl4daXdFX_k','hs2_7dVCgBc','CuVKObfXWeo','rl4zIYgfWJg','dzQWP9_Y_js','Q8y0JCWFT0A'];
+
+const Quran = {
+  idx: null, player: null, ready: false, pendingIdx: null, apiRequested: false, playing: false,
+  renderList() {
+    const ol = $('surahList');
+    if (ol.childElementCount) return;
+    SURAHS.forEach((name, i) => {
+      const li = document.createElement('li');
+      li.dataset.i = i;
+      li.innerHTML = `<span class="snum">${i+1}</span><span class="sname">سورة ${name}</span>`;
+      li.addEventListener('click', () => this.play(i));
+      ol.appendChild(li);
+    });
+  },
+  play(i) {
+    this.idx = i;
+    $('ytThumb').style.display = 'block';
+    $('piTitle').textContent = `سورة ${SURAHS[i]}`;
+    $('piSub').textContent = `${i+1} / 114 · Sheikh Mahmoud Ali Al-Banna`;
+    document.querySelectorAll('.surah-list li').forEach(el =>
+      el.classList.toggle('playing', Number(el.dataset.i) === i));
+    if (this.ready) this.player.loadVideoById(VIDEO_IDS[i]);
+    else { this.pendingIdx = i; this.ensure(); }
+  },
+  ensure() {
+    if (this.apiRequested) return;
+    this.apiRequested = true;
+    const create = () => {
+      this.player = new YT.Player('ytPlayerHost', {
+        width: '100%', videoId: VIDEO_IDS[this.pendingIdx ?? 0],
+        playerVars: { autoplay: 1, rel: 0, playsinline: 1, controls: 0 },
+        events: {
+          onReady: () => { this.ready = true; if (this.pendingIdx != null) { this.player.loadVideoById(VIDEO_IDS[this.pendingIdx]); this.pendingIdx = null; } },
+          onStateChange: (e) => {
+            this.playing = e.data === YT.PlayerState.PLAYING;
+            $('playBtn').textContent = this.playing ? '⏸' : '▶';
+            if (e.data === YT.PlayerState.ENDED && this.idx < VIDEO_IDS.length - 1) this.play(this.idx + 1);
+          },
+          onError: () => { if (this.idx < VIDEO_IDS.length - 1) this.play(this.idx + 1); }
+        }
+      });
+    };
+    if (window.YT && window.YT.Player) create();
+    else {
+      window.onYouTubeIframeAPIReady = create;
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(s);
+    }
+  }
+};
+$('playBtn').addEventListener('click', () => {
+  if (Quran.idx == null) { Quran.play(0); return; }
+  if (!Quran.ready) return;
+  Quran.playing ? Quran.player.pauseVideo() : Quran.player.playVideo();
+});
+$('prevBtn').addEventListener('click', () => { if (Quran.idx != null && Quran.idx > 0) Quran.play(Quran.idx - 1); });
+$('nextBtn').addEventListener('click', () => { if (Quran.idx != null && Quran.idx < VIDEO_IDS.length - 1) Quran.play(Quran.idx + 1); });
+$('ytThumb').addEventListener('click', () => $('ytThumb').classList.toggle('expanded'));
+Quran.renderList();
+
+/* ============ tabs ============ */
+$('tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + btn.dataset.tab));
+});
+
+/* ============ demo slider ============ */
+const slider = $('timeSlider');
+let sliderTouched = false;
+slider.addEventListener('pointerdown', () => { sliderTouched = true; });
+slider.addEventListener('input', () => {
+  if (pinnedMinutes != null && !sliderTouched) { slider.value = pinnedMinutes; return; }
+  state.overrideMinutes = Number(slider.value);
+  $('timeReadout').textContent = fmt12(state.overrideMinutes);
+  renderScene(state.overrideMinutes);
+  renderPrayers();
+});
+$('nowBtn').addEventListener('click', () => { state.overrideMinutes = null; pinnedMinutes = null; sliderTouched = true; tick(); });
+function tick() {
+  const m = nowMinutes();
+  if (state.overrideMinutes == null) {
+    slider.value = Math.floor(m);
+    $('timeReadout').textContent = fmt12(m) + ' (now)';
+  }
+  renderScene(m);
+  renderPrayers();
+}
+
+let pinnedMinutes = null;
+const tParam = new URLSearchParams(location.search).get('t');
+if (tParam) {
+  const mins = tParam.includes(':') ? toMin(tParam) : Number(tParam);
+  if (!Number.isNaN(mins)) {
+    pinnedMinutes = Math.floor(((mins % 1440) + 1440) % 1440);
+    const apply = () => {
+      state.overrideMinutes = pinnedMinutes;
+      slider.value = pinnedMinutes;
+      $('timeReadout').textContent = fmt12(pinnedMinutes);
+      renderScene(pinnedMinutes);
+      renderPrayers();
+    };
+    apply();
+    [200, 600, 1200, 2000].forEach((d) => setTimeout(apply, d));
+  }
+}
+
+addEventListener('resize', () => { sizeCanvas(); renderScene(nowMinutes()); });
+tick();
+setInterval(tick, 1000);
+loadTimes().then(tick);
+</script>
+</body>
+</html>

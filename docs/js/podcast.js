@@ -1,14 +1,17 @@
 /**
- * Podcast playlist — the Quran mushaf of Sheikh Mahmoud Ali Al-Banna,
- * playing the IDENTICAL recordings as the Spotify show, sourced from the
- * user's YouTube playlist (PL8475A8813886C6A5, "ختمة مرتّلة").
- * The first 114 playlist items are exactly surahs 1–114 in Quran order —
- * Al-Fatiha (1) → An-Nas (114) — the inverse of Spotify's newest-first
- * listing. Playback uses the YouTube IFrame API with auto-advance.
+ * Quran tab — audio-style player for the complete mushaf of Sheikh Mahmoud
+ * Ali Al-Banna (Egyptian Radio recordings), playing the IDENTICAL videos from
+ * the user's YouTube playlist (PL8475A8813886C6A5): its first 114 items are
+ * exactly surahs 1–114 in Quran order.
+ *
+ * Presented as a pure audio player (prev / play-pause / next + surah list).
+ * YouTube's terms require its player to remain visible, so it lives as a
+ * small corner thumbnail that can be tapped to enlarge.
+ *
+ * The global object keeps the name `Podcast` because the athan pipeline
+ * calls Podcast.pause() to give prayer audio priority.
  */
 const PODCAST = {
-  title: 'المصحف المرتل — الشيخ محمود علي البنا',
-  subtitle: 'تسجيلات الإذاعة المصرية · Egyptian Radio recordings',
   spotifyUrl: 'https://open.spotify.com/show/5d4FhdBUAYt220XU5seoUy',
   youtubeUrl: 'https://www.youtube.com/playlist?list=PL8475A8813886C6A5',
   videoIds: [
@@ -52,123 +55,98 @@ const PODCAST = {
 };
 
 const Podcast = {
-  open: false,
-  currentIndex: null,
+  idx: null,
   player: null,
-  playerReady: false,
+  ready: false,
+  playing: false,
+  _pendingIdx: null,
   _apiRequested: false,
-  _pendingIndex: null,
 
-  toggle() {
-    const panel = document.getElementById('podcastPanel');
-    const btn = document.getElementById('podcastBtn');
-    this.open = !this.open;
-    if (this.open) {
-      this.renderList();
-      panel.classList.add('open');
-      btn.textContent = '✕ Hide Playlist';
-    } else {
-      panel.classList.remove('open');
-      btn.textContent = '🎙 Play Podcast';
-      this.pause();
-    }
-  },
-
-  renderList() {
-    const list = document.getElementById('podcastList');
-    if (list.childElementCount) return;
+  init() {
+    const ol = document.getElementById('surahList');
+    if (!ol || ol.childElementCount) return;
     PODCAST.surahs.forEach((name, i) => {
       const li = document.createElement('li');
-      li.className = 'podcast-item';
-      li.dataset.index = i;
-      li.innerHTML = `<span class="pc-num">${i + 1}</span><span class="pc-name">سورة ${name}</span><span class="pc-state"></span>`;
-      li.addEventListener('click', () => this.playIndex(i));
-      list.appendChild(li);
+      li.dataset.i = i;
+      li.innerHTML = `<span class="snum">${i + 1}</span><span class="sname">سورة ${name}</span>`;
+      li.addEventListener('click', () => this.play(i));
+      ol.appendChild(li);
     });
+    document.getElementById('playBtn').addEventListener('click', () => {
+      if (this.idx == null) { this.play(0); return; }
+      if (!this.ready) return;
+      this.playing ? this.player.pauseVideo() : this.player.playVideo();
+    });
+    document.getElementById('prevBtn').addEventListener('click', () => {
+      if (this.idx != null && this.idx > 0) this.play(this.idx - 1);
+    });
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      if (this.idx != null && this.idx < PODCAST.videoIds.length - 1) this.play(this.idx + 1);
+    });
+    document.getElementById('ytThumb').addEventListener('click', () =>
+      document.getElementById('ytThumb').classList.toggle('expanded'));
   },
 
-  playIndex(i) {
+  play(i) {
     // Athan takes priority: don't interrupt a live athan/duaa broadcast.
     if (AudioManager.isPlaying()) {
-      App.logStatus('⚠️ Prayer audio is playing — podcast will not interrupt it.');
+      App.logStatus('⚠️ Prayer audio is playing — the Quran will not interrupt it.');
       return;
     }
-    this.currentIndex = i;
-    this.markCurrent();
-    document.getElementById('podcastPlayerBox').style.display = 'block';
-
-    if (this.playerReady) {
-      this.player.loadVideoById(PODCAST.videoIds[i]);
-    } else {
-      this._pendingIndex = i;
-      this._ensurePlayer();
-    }
+    this.idx = i;
+    document.getElementById('ytThumb').style.display = 'block';
+    document.getElementById('piTitle').textContent = `سورة ${PODCAST.surahs[i]}`;
+    document.getElementById('piSub').textContent = `${i + 1} / 114 · Sheikh Mahmoud Ali Al-Banna`;
+    document.querySelectorAll('.surah-list li').forEach(el =>
+      el.classList.toggle('playing', Number(el.dataset.i) === i));
+    if (this.ready) this.player.loadVideoById(PODCAST.videoIds[i]);
+    else { this._pendingIdx = i; this._ensure(); }
     App.logStatus(`🎙 Playing سورة ${PODCAST.surahs[i]} (${i + 1}/114)`);
   },
 
-  _ensurePlayer() {
+  _ensure() {
     if (this._apiRequested) return;
     this._apiRequested = true;
-
     const create = () => {
-      this.player = new YT.Player('podcastPlayer', {
+      this.player = new YT.Player('ytPlayerHost', {
         width: '100%',
-        height: '200',
-        videoId: PODCAST.videoIds[this._pendingIndex ?? 0],
-        playerVars: { autoplay: 1, rel: 0, playsinline: 1 },
+        videoId: PODCAST.videoIds[this._pendingIdx ?? 0],
+        playerVars: { autoplay: 1, rel: 0, playsinline: 1, controls: 0 },
         events: {
           onReady: () => {
-            this.playerReady = true;
-            if (this._pendingIndex != null) {
-              this.player.loadVideoById(PODCAST.videoIds[this._pendingIndex]);
-              this._pendingIndex = null;
+            this.ready = true;
+            if (this._pendingIdx != null) {
+              this.player.loadVideoById(PODCAST.videoIds[this._pendingIdx]);
+              this._pendingIdx = null;
             }
           },
           onStateChange: (e) => {
-            if (e.data === YT.PlayerState.ENDED) this._next();
+            this.playing = e.data === YT.PlayerState.PLAYING;
+            document.getElementById('playBtn').textContent = this.playing ? '⏸' : '▶';
+            if (e.data === YT.PlayerState.ENDED && this.idx < PODCAST.videoIds.length - 1) {
+              this.play(this.idx + 1);
+            }
           },
           onError: () => {
-            App.logStatus(`⚠️ سورة ${PODCAST.surahs[this.currentIndex]} could not play — skipping to the next one.`);
-            this._next();
+            App.logStatus(`⚠️ سورة ${PODCAST.surahs[this.idx]} could not play — skipping to the next one.`);
+            if (this.idx < PODCAST.videoIds.length - 1) this.play(this.idx + 1);
           }
         }
       });
     };
-
-    if (window.YT && window.YT.Player) {
-      create();
-    } else {
+    if (window.YT && window.YT.Player) create();
+    else {
       window.onYouTubeIframeAPIReady = create;
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(s);
     }
   },
 
-  _next() {
-    if (this.currentIndex != null && this.currentIndex < PODCAST.videoIds.length - 1) {
-      this.playIndex(this.currentIndex + 1);
-    }
-  },
-
-  /** Pause podcast playback (called when prayer audio starts). */
+  /** Pause Quran playback (called when prayer audio starts). */
   pause() {
-    if (this.playerReady && this.player?.pauseVideo) {
+    if (this.ready && this.player?.pauseVideo) {
       try { this.player.pauseVideo(); } catch { /* player may be gone */ }
     }
-  },
-
-  markCurrent() {
-    document.querySelectorAll('.podcast-item').forEach((el) => {
-      const isCurrent = Number(el.dataset.index) === this.currentIndex;
-      el.classList.toggle('playing', isCurrent);
-      el.querySelector('.pc-state').textContent = isCurrent ? '▶' : '';
-      if (isCurrent) el.scrollIntoView({ block: 'nearest' });
-    });
-  },
-
-  init() {
-    document.getElementById('podcastTitle').textContent = PODCAST.title;
-    document.getElementById('podcastSubtitle').textContent = PODCAST.subtitle;
   }
 };

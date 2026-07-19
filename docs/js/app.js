@@ -6,6 +6,8 @@ const App = {
 
   async init() {
     Config.load();
+    Scene.init();
+    Scene.setTheme(Config.get('ui_settings.theme', 'lake'));
     this.bindUI();
     this.logStatus('Starting Athan Web…');
 
@@ -79,6 +81,13 @@ const App = {
       const data = await PrayerTimesAPI.fetch(this.location.latitude, this.location.longitude, method);
       Scheduler.build(data);
       this.renderHijriDate(data);
+      // feed the living scene the real sun times (minutes since midnight)
+      const mins = {};
+      for (const [k, v] of Object.entries(data.prayer_times)) {
+        const [h, m] = (v || '').split(':').map(Number);
+        if (Number.isFinite(h) && Number.isFinite(m)) mins[k] = h * 60 + m;
+      }
+      Scene.setTimes(mins);
       this.logStatus('Prayer times loaded ✓');
     } catch (e) {
       console.error(e);
@@ -265,7 +274,6 @@ const App = {
 
     document.getElementById('locateBtn').addEventListener('click', () => this.useMyLocation(false));
 
-    document.getElementById('podcastBtn').addEventListener('click', () => Podcast.toggle());
     Podcast.init();
 
     document.getElementById('testBtn').addEventListener('click', () => this.testNextAthan());
@@ -276,11 +284,19 @@ const App = {
       this.logStatus('Playback stopped.');
     });
 
-    document.getElementById('settingsBtn').addEventListener('click', () => this.openSettings());
-    document.getElementById('closeSettings').addEventListener('click', () => this.closeSettings());
+    // Tab bar — Settings tab repopulates its fields on open
+    document.getElementById('tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + btn.dataset.tab));
+      if (btn.dataset.tab === 'settings') this.openSettings();
+    });
+
     document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
     document.getElementById('resetSettings').addEventListener('click', () => {
       Config.reset();
+      Scene.setTheme(Config.get('ui_settings.theme', 'lake'));
       this.openSettings();
       this.logStatus('Settings reset to defaults.');
     });
@@ -316,8 +332,9 @@ const App = {
   },
 
   openSettings() {
-    const panel = document.getElementById('settingsPanel');
-    panel.classList.add('open');
+    // Theme
+    const theme = Config.get('ui_settings.theme', 'lake');
+    document.querySelectorAll('input[name="theme"]').forEach((r) => { r.checked = r.value === theme; });
 
     // Prayers
     for (const p of PRAYER_NAMES) {
@@ -347,11 +364,12 @@ const App = {
     document.getElementById('showNotifs').checked = Config.get('ui_settings.show_notifications', true);
   },
 
-  closeSettings() {
-    document.getElementById('settingsPanel').classList.remove('open');
-  },
-
   async saveSettings() {
+    const themeSel = document.querySelector('input[name="theme"]:checked');
+    if (themeSel) {
+      Config.set('ui_settings.theme', themeSel.value);
+      Scene.setTheme(themeSel.value);
+    }
     for (const p of PRAYER_NAMES) {
       Config.set(`prayer_settings.enabled_prayers.${p}`, document.getElementById(`en_${p}`).checked);
     }
@@ -379,7 +397,6 @@ const App = {
     }
     Config.set('ui_settings.show_notifications', document.getElementById('showNotifs').checked);
 
-    this.closeSettings();
     this.logStatus('Settings saved — rebuilding schedule…');
     await this.resolveLocation();
     await this.loadPrayerTimes();

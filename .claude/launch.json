@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8734", "--directory", "docs"],
       "port": 8734
+    },
+    {
+      "name": "athan-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8735", "--directory", "demo"],
+      "port": 8735
     }
   ]
 }

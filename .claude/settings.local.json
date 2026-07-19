@@ -25,7 +25,17 @@
       "Bash(git push *)",
       "Bash(git commit -m 'Add PROJECT_NOTES.md — full project history and current state *)",
       "Bash(git commit -m 'Keep athan firing in background/minimized tabs *)",
-      "Bash(git commit -m 'Add tip: playing the Quran podcast keeps the tab active *)"
+      "Bash(git commit -m 'Add tip: playing the Quran podcast keeps the tab active *)",
+      "Bash(git commit -m 'Update PROJECT_NOTES: background-tab fixes, podcast keep-alive tip, update-propagation section *)",
+      "Bash(git commit -m 'README: document Intel-VLC-on-Apple-Silicon dlopen error and fix *)",
+      "Bash(python3 -)",
+      "Bash(python3 -m venv imgenv)",
+      "Bash(./imgenv/bin/pip -q install pillow numpy)",
+      "Bash(./imgenv/bin/python -c \"import PIL, numpy; print\\('tools ready'\\)\")",
+      "Bash(curl -s \"https://unsplash.com/napi/search/photos?query=mountain%20range%20clear%20sky%20daylight&per_page=12\" -H \"User-Agent: Mozilla/5.0\")",
+      "Bash(curl -s \"https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=2200&q=85&auto=format\" -o lake_full.jpg)",
+      "Bash(./imgenv/bin/python)",
+      "Bash(git commit -m 'Living-scene redesign with selectable themes, tabbed layout, Quran audio player *)"
     ]
   }
 }
