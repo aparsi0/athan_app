@@ -35,7 +35,8 @@
       "Bash(curl -s \"https://unsplash.com/napi/search/photos?query=mountain%20range%20clear%20sky%20daylight&per_page=12\" -H \"User-Agent: Mozilla/5.0\")",
       "Bash(curl -s \"https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=2200&q=85&auto=format\" -o lake_full.jpg)",
       "Bash(./imgenv/bin/python)",
-      "Bash(git commit -m 'Living-scene redesign with selectable themes, tabbed layout, Quran audio player *)"
+      "Bash(git commit -m 'Living-scene redesign with selectable themes, tabbed layout, Quran audio player *)",
+      "Bash(git commit -m 'PROJECT_NOTES: document living-scene redesign, themes, Quran tab *)"
     ]
   }
 }

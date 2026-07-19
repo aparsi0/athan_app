@@ -140,6 +140,33 @@ the app shell **network-first**, so visitors get the new version on their next p
 refresh — no reinstall, no cache clearing. Tabs that are already open keep running the old
 code until reloaded (one refresh + the usual welcome tap).
 
+## 7b. Living-scene redesign (2026-07-19)
+
+Prototyped in `demo/` (kept for reference; not deployed), then shipped to `docs/`:
+- **Layout**: QuantumPT-inspired — centered brand + tab bar (Athan / Schedule / Quran /
+  Activity / Settings). Athan is the main tab. Old side-drawer settings became the
+  Settings tab; the podcast card became the Quran tab.
+- **`docs/js/scene.js`**: canvas scene engine driven by the visitor's REAL sun times.
+  Draw order sky → stars → sun/moon(+glow) → terrain, so celestial bodies rise/set
+  BEHIND the landscape and stars are occluded by it. Sun is a warm bloom near the
+  horizon, subtle glare at midday; moon is a crescent sprite; light reflects on water.
+- **Four themes**, selectable in Settings, saved per-visitor (`ui_settings.theme`):
+  `lake` (default; real photograph with its sky segmented out — assets/terrain.png +
+  assets/ridge.json treeline profile, macOS-dynamic-wallpaper technique; source photo:
+  Unsplash 1439066615861, lake + pine treeline + dock), `ridges` (Big Sur-style layered
+  art), `mosque` (art ridges + mosque silhouette, drawn right-of-center to stay visible),
+  `classic` (original plain dark, no canvas).
+- **Quran tab**: audio-style player (⏮ ⏯ ⏭ + 114-surah list, auto-advance, skip on embed
+  error) controlling a minimized corner YouTube player (YouTube requires its player to be
+  visible; tap to enlarge). Global object still named `Podcast` — the athan pipeline calls
+  `Podcast.pause()` for priority.
+- Sky-segmentation pipeline (venv with Pillow/numpy, per-column blue-sky scan) lives in the
+  scratchpad; to swap the photo, re-run it on any image with a clean skyline.
+- sw.js v7 (added scene.js, terrain.png ~2.2 MB, ridge.json). All prior behavior preserved.
+- User declined an insect-repelling keep-alive frequency after science/hardware/ethics
+  explanation (ultrasonics don't repel roaches; speakers can't emit >20 kHz; audible-to-kids
+  risk). Keep-alive track confirmed harmless to speakers.
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind — see §6).
