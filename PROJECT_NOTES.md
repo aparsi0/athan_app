@@ -150,6 +150,11 @@ Prototyped in `demo/` (kept for reference; not deployed), then shipped to `docs/
   Draw order sky → stars → sun/moon(+glow) → terrain, so celestial bodies rise/set
   BEHIND the landscape and stars are occluded by it. Sun is a warm bloom near the
   horizon, subtle glare at midday; moon is a crescent sprite; light reflects on water.
+- **2026-07-19 later revision (current)**: user found the sky-cut versions ugly →
+  themes now show the ORIGINAL uncropped photos (`assets/photo_a..e.jpg`, small JPEGs) and
+  the scene engine does LIGHTING ONLY: brightness/saturation by time of day, cool night
+  cast, warm dawn/sunset glow. No drawn sun/moon/stars, no canvas — layered divs
+  (#photo/#shade/#glow) with CSS transitions. terrain_*/ridge_* assets deleted; sw v9.
 - **Themes = exactly five real-photo landscapes** (user's choice, replacing the earlier
   art/classic set; old saved values migrate to `d`). Values `a`–`e` in `ui_settings.theme`,
   assets `terrain_X.png` + `ridge_X.json`, lazy-loaded per selected theme (sw v8 caches
