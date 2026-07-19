@@ -130,7 +130,71 @@ You need these things on any computer:
    caffeinate -i python3 main_headless.py
    ```
 
-### Run Automatically on macOS with launchd
+### 🌙 Install as a Menu-Bar App with Auto-Start (macOS — recommended)
+
+This is the full desktop experience: a standalone app with the **green crescent
+icon in the menu bar** (top-right of the screen) that **starts automatically every
+time you turn on your Mac**, with the Mac kept awake so no prayer is ever missed.
+
+**Step 1 — Prerequisites** (once):
+
+1. Install VLC — on Apple Silicon it must be the **arm64** build (see the warning in the M1/M2/M3 section above):
+   ```bash
+   brew install --cask vlc
+   ```
+2. Have this project folder somewhere permanent (e.g. `~/Desktop/athan_app`) — the auto-start points at it, so don't move it afterwards.
+
+**Step 2 — Build the app** (once, ~2 minutes):
+
+```bash
+cd /path/to/athan_app
+chmod +x packaging/build_macos_app.sh
+./packaging/build_macos_app.sh
+```
+
+This creates `dist/AthanApp.app` (the script also creates the virtual environment and installs everything it needs).
+
+**Step 3 — First launch** (Gatekeeper approval, once):
+
+1. In Finder, open the `dist` folder inside the project.
+2. **Right-click** `AthanApp.app` → **Open** → confirm **Open** in the dialog.
+   (A normal double-click may be blocked the first time because the app isn't signed with an Apple developer certificate. If macOS still refuses: System Settings → Privacy & Security → scroll down → **Open Anyway**.)
+3. The **green crescent icon** appears in the menu bar. Right-click it to see the next prayer, today's schedule, test the audio, or quit.
+
+**Step 4 — Auto-start at every login, with the Mac kept awake:**
+
+```bash
+chmod +x macos/install_menubar_agent.sh
+./macos/install_menubar_agent.sh
+```
+
+This installs a launch agent that runs the app inside `caffeinate -dims`, which prevents the system, display and disks from sleeping — so athans fire even if you leave the Mac untouched all day. (If you'd rather let the **display** sleep while the athan keeps working, edit `caffeinate -dims` to `caffeinate -ims` in `macos/com.apa.athan-menubar.plist` and re-run the installer.)
+
+**Step 5 — Verify:**
+
+```bash
+launchctl print gui/$(id -u)/com.apa.athan-app | head   # state should say: running
+```
+
+…and the green crescent should be in the menu bar. Restart the Mac once to confirm it comes back by itself.
+
+**Managing it:**
+
+```bash
+# Restart the app
+launchctl kickstart -k gui/$(id -u)/com.apa.athan-app
+
+# Stop and remove auto-start
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.apa.athan-app.plist
+rm ~/Library/LaunchAgents/com.apa.athan-app.plist
+
+# Logs
+tail -f ~/.athan_app/launchd.stdout.log
+```
+
+Note: this and the headless agent below share the same agent name, so installing one replaces the other — you'll never get two athans playing at once.
+
+### Run Automatically on macOS with launchd (headless — no menu-bar icon)
 
 If you want the app to keep running without keeping Terminal open, use the included macOS launch agent.
 
