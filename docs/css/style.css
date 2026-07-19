@@ -22,7 +22,15 @@ body.classic-theme {
   background: radial-gradient(1200px 600px at 50% -100px, #16405f 0%, #0b1c2e 60%);
 }
 
-#scene { position: fixed; inset: 0; z-index: -3; display: block; }
+#scene { position: fixed; inset: 0; z-index: -3; }
+#photo {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: filter 2s linear, background-image 0.4s;
+}
+#shade { position: absolute; inset: 0; mix-blend-mode: multiply; transition: background 2s linear; }
+#glow { position: absolute; inset: 0; mix-blend-mode: screen; transition: background 2s linear; pointer-events: none; }
 
 /* ============ BRAND + TABS ============ */
 header { text-align: center; padding: 30px 16px 0; }

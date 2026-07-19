@@ -1,10 +1,8 @@
 /**
- * Living scene engine — renders the page background as a real landscape
- * photograph whose light follows the visitor's real sun/prayer times
- * (macOS dynamic-wallpaper style). Each theme is a photo whose sky has been
- * segmented out, so the engine's own sky — gradients, stars, sun, moon —
- * renders BEHIND the photographic terrain: celestial bodies rise from and
- * set behind the real skyline, and stars are occluded by it.
+ * Living scene engine — shows each theme's ORIGINAL, uncropped photograph
+ * and only adjusts its lighting to match the time of day at the visitor's
+ * location: bright at midday, warm at sunrise/sunset, dark and cool at
+ * night. No cutting, no drawn sun/moon/stars — just light.
  *
  * Themes (Config 'ui_settings.theme'): a | b | c | d | e
  *   a — Alpine Valley      b — Above the Clouds   c — Mountain Lake
@@ -21,52 +19,29 @@ const SCENE_THEMES = {
 const Scene = {
   theme: 'd',
   times: { fajr: 285, sunrise: 370, dhuhr: 801, asr: 1030, maghrib: 1231, isha: 1316 },
-  canvas: null, ctx: null, off: null, octx: null,
-  W: 0, H: 0, DPR: 1,
-  stars: [],
-  _assets: {},   // theme key → {img, ridge, ridgeMax}
 
   init() {
-    this.canvas = document.getElementById('scene');
-    if (!this.canvas) return;
-    this.ctx = this.canvas.getContext('2d');
-    this.off = document.createElement('canvas');
-    this.octx = this.off.getContext('2d');
+    this.photoEl = document.getElementById('photo');
+    this.shadeEl = document.getElementById('shade');
+    this.glowEl = document.getElementById('glow');
+    if (!this.photoEl) return;
 
     const saved = Config.get('ui_settings.theme', 'd');
     this.theme = SCENE_THEMES[saved] ? saved : 'd';
-    this._load(this.theme);
+    this.photoEl.style.backgroundImage = `url('assets/photo_${this.theme}.jpg')`;
 
-    let seed = 42;
-    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    this.stars = Array.from({ length: 170 }, () => ({
-      x: rnd(), y: rnd() * 0.62, r: rnd() * 1.2 + 0.25, tw: rnd() * 6.28, a: rnd() * 0.6 + 0.4
-    }));
-
-    this.resize();
-    addEventListener('resize', () => { this.resize(); this.render(); });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') this.render();
     });
-    setInterval(() => this.render(), 30000);
+    setInterval(() => this.render(), 60000);
     this.render();
-  },
-
-  _load(key) {
-    if (this._assets[key]) return;
-    const entry = { img: new Image(), ridge: null, ridgeMax: 0.4 };
-    entry.img.src = `assets/terrain_${key}.png`;
-    entry.img.onload = () => { if (this.theme === key) this.render(); };
-    fetch(`assets/ridge_${key}.json`).then(r => r.json()).then(d => {
-      entry.ridge = d; entry.ridgeMax = Math.max(...d);
-      if (this.theme === key) this.render();
-    }).catch(() => {});
-    this._assets[key] = entry;
   },
 
   setTheme(name) {
     this.theme = SCENE_THEMES[name] ? name : 'd';
-    this._load(this.theme);
+    if (this.photoEl) {
+      this.photoEl.style.backgroundImage = `url('assets/photo_${this.theme}.jpg')`;
+    }
     this.render();
   },
 
@@ -77,49 +52,32 @@ const Scene = {
     this.render();
   },
 
-  resize() {
-    this.DPR = Math.min(2, window.devicePixelRatio || 1);
-    this.W = innerWidth; this.H = innerHeight;
-    for (const [c, cx] of [[this.canvas, this.ctx], [this.off, this.octx]]) {
-      c.width = this.W * this.DPR; c.height = this.H * this.DPR;
-      cx.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
-    }
-    this.canvas.style.width = this.W + 'px';
-    this.canvas.style.height = this.H + 'px';
-  },
-
-  /* ---------- palette ---------- */
   _lerp(a, b, t) { return a + (b - a) * t; },
   _clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); },
-  _rgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; },
-  _mixHex(h1, h2, t) {
-    const a = this._rgb(h1), b = this._rgb(h2);
-    return '#' + [0, 1, 2].map(i => Math.round(this._lerp(a[i], b[i], t)).toString(16).padStart(2, '0')).join('');
-  },
-  _mixC(h1, h2, t) {
-    const a = this._rgb(h1), b = this._rgb(h2);
-    return `rgb(${Math.round(this._lerp(a[0], b[0], t))},${Math.round(this._lerp(a[1], b[1], t))},${Math.round(this._lerp(a[2], b[2], t))})`;
-  },
 
+  /* Lighting keyframes tied to the REAL sun/prayer times:
+     [minute, brightness, saturate, shade(rgb array + alpha), glow(rgb array + alpha), phase]
+     shade = cool multiply-style dimming layer; glow = warm light near the
+     horizon at dawn/golden hour/sunset. */
   _anchors() {
     const T = this.times, mid = (a, b) => (a + b) / 2;
     return [
-      [T.fajr - 90,            '#040711', '#070c1a', '#0b1326', 0.16, 'Deep night'],
-      [T.fajr,                 '#0a1228', '#161f3c', '#3c3a58', 0.26, 'Fajr — first light'],
-      [mid(T.fajr, T.sunrise), '#152048', '#333a6e', '#b06a4e', 0.42, 'Dawn'],
-      [T.sunrise,              '#2b4a7c', '#7a7ba9', '#f5a55c', 0.60, 'Sunrise'],
-      [T.sunrise + 50,         '#4a7ab8', '#8bacd2', '#f7cc90', 0.82, 'Morning'],
-      [T.dhuhr,                '#3f88d5', '#79b5e8', '#d3e8f8', 1.00, 'Midday'],
-      [T.asr,                  '#3d7ec8', '#83b1e1', '#ead9a9', 0.93, 'Afternoon'],
-      [T.maghrib - 50,         '#3a62a2', '#9c88a2', '#f5ad62', 0.76, 'Golden hour'],
-      [T.maghrib,              '#253560', '#7c5a7a', '#ee6f3c', 0.52, 'Sunset'],
-      [mid(T.maghrib, T.isha), '#101a3a', '#343060', '#7c465e', 0.36, 'Dusk'],
-      [T.isha,                 '#070c1e', '#101632', '#1e2446', 0.24, 'Night falls'],
-      [T.isha + 80,            '#040711', '#070c1a', '#0b1326', 0.16, 'Night']
+      [T.fajr - 90,            0.30, 0.55, [16, 26, 58], 0.50, [0, 0, 0], 0.00, 'Deep night'],
+      [T.fajr,                 0.38, 0.62, [20, 30, 64], 0.42, [70, 50, 80], 0.10, 'Fajr — first light'],
+      [mid(T.fajr, T.sunrise), 0.52, 0.75, [30, 36, 80], 0.30, [200, 110, 60], 0.16, 'Dawn'],
+      [T.sunrise,              0.70, 0.92, [60, 70, 110], 0.16, [255, 150, 70], 0.20, 'Sunrise'],
+      [T.sunrise + 50,         0.90, 1.02, [255, 255, 255], 0.00, [255, 210, 140], 0.10, 'Morning'],
+      [T.dhuhr,                1.04, 1.05, [255, 255, 255], 0.00, [255, 255, 255], 0.00, 'Midday'],
+      [T.asr,                  0.98, 1.03, [255, 255, 255], 0.00, [255, 225, 150], 0.06, 'Afternoon'],
+      [T.maghrib - 50,         0.86, 1.05, [120, 100, 110], 0.08, [255, 165, 80], 0.16, 'Golden hour'],
+      [T.maghrib,              0.72, 0.95, [70, 60, 100], 0.16, [255, 130, 60], 0.26, 'Sunset'],
+      [mid(T.maghrib, T.isha), 0.52, 0.75, [36, 36, 80], 0.30, [170, 85, 90], 0.14, 'Dusk'],
+      [T.isha,                 0.36, 0.62, [18, 26, 60], 0.44, [60, 48, 90], 0.06, 'Night falls'],
+      [T.isha + 80,            0.30, 0.55, [16, 26, 58], 0.50, [0, 0, 0], 0.00, 'Night']
     ];
   },
 
-  paletteAt(minute) {
+  _gradeAt(minute) {
     const A = this._anchors();
     let m = minute;
     if (m < A[0][0]) m += 1440;
@@ -128,9 +86,14 @@ const Scene = {
     if (i >= A.length - 1) i = A.length - 2;
     const t = this._clamp((m - A[i][0]) / Math.max(1, A[i + 1][0] - A[i][0]), 0, 1);
     const P = A[i], Q = A[i + 1];
+    const mixV = (a, b) => this._lerp(a, b, t);
+    const mixRGB = (a, b) => a.map((v, k) => Math.round(this._lerp(v, b[k], t)));
     return {
-      top: this._mixHex(P[1], Q[1], t), mid: this._mixHex(P[2], Q[2], t), hor: this._mixHex(P[3], Q[3], t),
-      amb: this._lerp(P[4], Q[4], t), phase: t < 0.5 ? P[5] : Q[5]
+      bright: mixV(P[1], Q[1]),
+      sat: mixV(P[2], Q[2]),
+      shade: mixRGB(P[3], Q[3]), shadeA: mixV(P[4], Q[4]),
+      glow: mixRGB(P[5], Q[5]), glowA: mixV(P[6], Q[6]),
+      phase: t < 0.5 ? P[7] : Q[7]
     };
   },
 
@@ -139,135 +102,15 @@ const Scene = {
     return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
   },
 
-  /* ---------- render ---------- */
   render() {
-    if (!this.ctx) return;
-    const minute = this._nowMinutes();
-    const pal = this.paletteAt(minute);
+    if (!this.photoEl) return;
+    const g = this._gradeAt(this._nowMinutes());
     const phaseEl = document.getElementById('phaseText');
-    if (phaseEl) phaseEl.textContent = pal.phase;
+    if (phaseEl) phaseEl.textContent = g.phase;
 
-    const { ctx, W, H, times: T } = this;
-    ctx.clearRect(0, 0, W, H);
-
-    /* sky */
-    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.9);
-    sky.addColorStop(0, pal.top); sky.addColorStop(0.55, pal.mid); sky.addColorStop(1, pal.hor);
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    /* stars */
-    const starA = this._clamp((0.38 - pal.amb) / 0.22, 0, 1);
-    if (starA > 0) {
-      for (const s of this.stars) {
-        ctx.globalAlpha = starA * s.a * (0.75 + 0.25 * Math.sin(minute * 0.5 + s.tw));
-        ctx.fillStyle = '#e9eeff';
-        ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 7); ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    /* horizon geometry from the current theme's skyline */
-    const A = this._assets[this.theme];
-    const ready = A && A.img.complete && A.img.naturalWidth > 0;
-    const box = ready ? this._terrainBox(A.img) : null;
-    const horizonY = ready && A.ridge
-      ? box.dy + A.ridgeMax * box.dh + H * 0.06
-      : H * 0.7;
-    const peakY = Math.min(H * 0.24, horizonY - H * 0.3);
-    const arc = (f) => [this._lerp(W * 0.07, W * 0.93, f), horizonY - Math.sin(Math.PI * f) * (horizonY - peakY)];
-
-    /* sun */
-    let sunInfo = null, moonInfo = null;
-    if (minute >= T.sunrise - 40 && minute <= T.maghrib + 40) {
-      const frac = (minute - T.sunrise) / (T.maghrib - T.sunrise);
-      const [sx, sy] = arc(this._clamp(frac, -0.06, 1.06));
-      const warm = 1 - Math.sin(Math.PI * this._clamp(frac, 0, 1));
-      const glowC = this._mixC('#fff3d8', '#ffb765', warm);
-      ctx.globalCompositeOperation = 'lighter';
-      const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * (0.14 + 0.38 * warm));
-      glow.addColorStop(0, glowC.replace('rgb', 'rgba').replace(')', `,${0.18 + 0.5 * warm})`));
-      glow.addColorStop(0.4, glowC.replace('rgb', 'rgba').replace(')', `,${0.06 + 0.12 * warm})`));
-      glow.addColorStop(1, 'rgba(255,200,120,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = this._mixC('#fffbef', '#ffd27a', warm);
-      ctx.beginPath(); ctx.arc(sx, sy, H * (0.016 + 0.010 * warm), 0, 7); ctx.fill();
-      sunInfo = { sx, sy, warm };
-    }
-
-    /* moon (crescent on its own sprite so the cut never erases the sky) */
-    const nightLen = (T.fajr + 1440 - T.isha) % 1440;
-    let nf = null;
-    if (minute >= T.isha + 20) nf = (minute - T.isha - 20) / (nightLen + 40);
-    else if (minute <= T.fajr + 20) nf = (minute + 1440 - T.isha - 20) / (nightLen + 40);
-    if (nf != null && starA > 0.05) {
-      const [mx, my] = arc(this._clamp(nf, 0, 1));
-      ctx.globalCompositeOperation = 'lighter';
-      const mg = ctx.createRadialGradient(mx, my, 0, mx, my, H * 0.16);
-      mg.addColorStop(0, 'rgba(205,216,255,0.35)'); mg.addColorStop(1, 'rgba(205,216,255,0)');
-      ctx.fillStyle = mg;
-      ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'source-over';
-      const mr = H * 0.015;
-      const spr = document.createElement('canvas');
-      spr.width = spr.height = Math.ceil(mr * 2.4);
-      const sc = spr.getContext('2d'), c = spr.width / 2;
-      sc.fillStyle = '#f2f3ea';
-      sc.beginPath(); sc.arc(c, c, mr, 0, 7); sc.fill();
-      sc.globalCompositeOperation = 'destination-out';
-      sc.beginPath(); sc.arc(c + mr * 0.45, c - mr * 0.28, mr * 0.86, 0, 7); sc.fill();
-      ctx.drawImage(spr, mx - c, my - c);
-      moonInfo = { mx, my };
-    }
-
-    /* terrain — drawn last so it occludes sun, moon and stars */
-    if (ready) this._drawTerrain(A, pal, box, sunInfo, moonInfo);
-  },
-
-  _terrainBox(img) {
-    const iw = img.naturalWidth, ih = img.naturalHeight;
-    const s = Math.max(this.W / iw, this.H / ih);
-    return { dx: (this.W - iw * s) / 2, dy: this.H - ih * s, dw: iw * s, dh: ih * s };
-  },
-
-  _ridgeYat(A, fx, box) {
-    if (!A.ridge) return this.H * 0.6;
-    const imgFx = this._clamp((fx * this.W - box.dx) / box.dw, 0, 1);
-    return box.dy + A.ridge[this._clamp(Math.round(imgFx * 127), 0, 127)] * box.dh;
-  },
-
-  _drawTerrain(A, pal, box, sunInfo, moonInfo) {
-    const { octx, W, H } = this;
-    const dayness = this._clamp((pal.amb - 0.16) / 0.84, 0, 1);
-    octx.clearRect(0, 0, W, H);
-    octx.filter = `brightness(${(0.36 + 0.72 * dayness).toFixed(3)}) saturate(${(0.55 + 0.55 * dayness).toFixed(3)})`;
-    octx.drawImage(A.img, box.dx, box.dy, box.dw, box.dh);
-    octx.filter = 'none';
-    octx.globalCompositeOperation = 'source-atop';
-    octx.fillStyle = `rgba(16,26,58,${(0.45 * (1 - dayness)).toFixed(3)})`;
-    octx.fillRect(0, 0, W, H);
-    if (sunInfo && sunInfo.warm > 0.15) {
-      const wa = sunInfo.warm;
-      octx.fillStyle = `rgba(255,150,70,${(0.14 * wa).toFixed(3)})`;
-      octx.fillRect(0, 0, W, H);
-      const ry = this._ridgeYat(A, sunInfo.sx / W, box);
-      const wg = octx.createRadialGradient(sunInfo.sx, ry, 0, sunInfo.sx, ry, H * 0.5);
-      wg.addColorStop(0, `rgba(255,180,90,${(0.34 * wa).toFixed(3)})`);
-      wg.addColorStop(1, 'rgba(255,180,90,0)');
-      octx.fillStyle = wg;
-      octx.fillRect(0, ry - H * 0.02, W, H);
-    }
-    if (moonInfo) {
-      const ry = this._ridgeYat(A, moonInfo.mx / W, box);
-      const mgw = octx.createRadialGradient(moonInfo.mx, ry, 0, moonInfo.mx, ry, H * 0.4);
-      mgw.addColorStop(0, 'rgba(200,215,255,0.20)');
-      mgw.addColorStop(1, 'rgba(200,215,255,0)');
-      octx.fillStyle = mgw;
-      octx.fillRect(0, ry - H * 0.02, W, H);
-    }
-    octx.globalCompositeOperation = 'source-over';
-    this.ctx.drawImage(this.off, 0, 0, W, H);
+    this.photoEl.style.filter = `brightness(${g.bright.toFixed(3)}) saturate(${g.sat.toFixed(3)})`;
+    this.shadeEl.style.background = `rgba(${g.shade.join(',')},${g.shadeA.toFixed(3)})`;
+    this.glowEl.style.background =
+      `linear-gradient(180deg, transparent 35%, rgba(${g.glow.join(',')},${g.glowA.toFixed(3)}) 100%)`;
   }
 };
