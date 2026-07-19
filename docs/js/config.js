@@ -67,7 +67,7 @@ const DEFAULT_CONFIG = {
   },
   ui_settings: {
     show_notifications: true,
-    theme: 'lake'
+    theme: 'd'
   }
 };
 

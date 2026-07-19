@@ -69,7 +69,7 @@ main {
 @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
 
 .card {
-  background: rgba(8,16,30,0.58);
+  background: rgba(8,16,30,0.72);
   border: 1px solid rgba(255,255,255,0.16);
   border-radius: var(--radius);
   padding: 22px;
@@ -282,6 +282,25 @@ ol.surah-list li.playing .sname { color: var(--gold); }
 }
 .theme-opt span { color: var(--muted); font-size: 11.5px; }
 .theme-opt:has(input:checked) { border-color: var(--gold); background: rgba(212,175,55,0.12); }
+
+/* Install tab */
+.install-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.install-list a {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s;
+  background: rgba(0,0,0,0.15);
+}
+.install-list a:hover { background: rgba(212,175,55,0.12); border-color: var(--gold); }
+.inst-icon { font-size: 24px; min-width: 34px; text-align: center; }
+.inst-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.inst-text strong { font-size: 15px; }
+.inst-text span { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.inst-go { color: var(--gold-soft); font-size: 16px; }
 
 footer {
   text-align: center;

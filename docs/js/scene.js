@@ -1,22 +1,30 @@
 /**
- * Living scene engine — renders the page background as a landscape whose
- * light follows the visitor's real sun/prayer times (macOS dynamic-wallpaper
- * style). Draw order: sky → stars → sun/moon (+glow) → terrain, so celestial
- * bodies rise from and set behind the landscape.
+ * Living scene engine — renders the page background as a real landscape
+ * photograph whose light follows the visitor's real sun/prayer times
+ * (macOS dynamic-wallpaper style). Each theme is a photo whose sky has been
+ * segmented out, so the engine's own sky — gradients, stars, sun, moon —
+ * renders BEHIND the photographic terrain: celestial bodies rise from and
+ * set behind the real skyline, and stars are occluded by it.
  *
- * Themes (Config 'ui_settings.theme'):
- *   lake    — real lake-and-forest photograph with its sky cut out (default)
- *   ridges  — Big Sur-style layered art mountains
- *   mosque  — art mountains with a mosque silhouette
- *   classic — the original plain dark look (no scene)
+ * Themes (Config 'ui_settings.theme'): a | b | c | d | e
+ *   a — Alpine Valley      b — Above the Clouds   c — Mountain Lake
+ *   d — Lake Dock (default) e — Golden Valley
  */
+const SCENE_THEMES = {
+  a: { label: 'Alpine Valley' },
+  b: { label: 'Above the Clouds' },
+  c: { label: 'Mountain Lake' },
+  d: { label: 'Lake Dock' },
+  e: { label: 'Golden Valley' }
+};
+
 const Scene = {
-  theme: 'lake',
+  theme: 'd',
   times: { fajr: 285, sunrise: 370, dhuhr: 801, asr: 1030, maghrib: 1231, isha: 1316 },
   canvas: null, ctx: null, off: null, octx: null,
   W: 0, H: 0, DPR: 1,
-  terrainImg: null, ridge: null, ridgeMax: 0.4,
-  stars: [], artRidges: null,
+  stars: [],
+  _assets: {},   // theme key → {img, ridge, ridgeMax}
 
   init() {
     this.canvas = document.getElementById('scene');
@@ -24,28 +32,16 @@ const Scene = {
     this.ctx = this.canvas.getContext('2d');
     this.off = document.createElement('canvas');
     this.octx = this.off.getContext('2d');
-    this.theme = Config.get('ui_settings.theme', 'lake');
 
-    this.terrainImg = new Image();
-    this.terrainImg.src = 'assets/terrain.png';
-    this.terrainImg.onload = () => this.render();
-    fetch('assets/ridge.json').then(r => r.json()).then(d => {
-      this.ridge = d; this.ridgeMax = Math.max(...d); this.render();
-    }).catch(() => {});
+    const saved = Config.get('ui_settings.theme', 'd');
+    this.theme = SCENE_THEMES[saved] ? saved : 'd';
+    this._load(this.theme);
 
     let seed = 42;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     this.stars = Array.from({ length: 170 }, () => ({
       x: rnd(), y: rnd() * 0.62, r: rnd() * 1.2 + 0.25, tw: rnd() * 6.28, a: rnd() * 0.6 + 0.4
     }));
-    seed = 1337;
-    const line = (baseY, amp, n) => Array.from({ length: n + 1 }, (_, i) => [i / n, baseY + (rnd() * 2 - 1) * amp]);
-    this.artRidges = [
-      { pts: line(0.575, 0.045, 6), haze: 0.52 },
-      { pts: line(0.660, 0.055, 5), haze: 0.34 },
-      { pts: line(0.760, 0.055, 5), haze: 0.18 },
-      { pts: line(0.880, 0.030, 4), haze: 0.08 }
-    ];
 
     this.resize();
     addEventListener('resize', () => { this.resize(); this.render(); });
@@ -56,9 +52,21 @@ const Scene = {
     this.render();
   },
 
+  _load(key) {
+    if (this._assets[key]) return;
+    const entry = { img: new Image(), ridge: null, ridgeMax: 0.4 };
+    entry.img.src = `assets/terrain_${key}.png`;
+    entry.img.onload = () => { if (this.theme === key) this.render(); };
+    fetch(`assets/ridge_${key}.json`).then(r => r.json()).then(d => {
+      entry.ridge = d; entry.ridgeMax = Math.max(...d);
+      if (this.theme === key) this.render();
+    }).catch(() => {});
+    this._assets[key] = entry;
+  },
+
   setTheme(name) {
-    this.theme = name;
-    document.body.classList.toggle('classic-theme', name === 'classic');
+    this.theme = SCENE_THEMES[name] ? name : 'd';
+    this._load(this.theme);
     this.render();
   },
 
@@ -139,11 +147,6 @@ const Scene = {
     const phaseEl = document.getElementById('phaseText');
     if (phaseEl) phaseEl.textContent = pal.phase;
 
-    if (this.theme === 'classic') {
-      this.ctx.clearRect(0, 0, this.W, this.H);
-      return;
-    }
-
     const { ctx, W, H, times: T } = this;
     ctx.clearRect(0, 0, W, H);
 
@@ -164,12 +167,13 @@ const Scene = {
       ctx.globalAlpha = 1;
     }
 
-    /* horizon geometry per theme */
-    const usePhoto = this.theme === 'lake' && this.terrainImg?.complete && this.terrainImg.naturalWidth;
-    const box = usePhoto ? this._terrainBox() : null;
-    const horizonY = usePhoto && this.ridge
-      ? box.dy + this.ridgeMax * box.dh + H * 0.06
-      : H * 0.84;
+    /* horizon geometry from the current theme's skyline */
+    const A = this._assets[this.theme];
+    const ready = A && A.img.complete && A.img.naturalWidth > 0;
+    const box = ready ? this._terrainBox(A.img) : null;
+    const horizonY = ready && A.ridge
+      ? box.dy + A.ridgeMax * box.dh + H * 0.06
+      : H * 0.7;
     const peakY = Math.min(H * 0.24, horizonY - H * 0.3);
     const arc = (f) => [this._lerp(W * 0.07, W * 0.93, f), horizonY - Math.sin(Math.PI * f) * (horizonY - peakY)];
 
@@ -218,29 +222,28 @@ const Scene = {
       moonInfo = { mx, my };
     }
 
-    /* terrain */
-    if (usePhoto) this._drawPhotoTerrain(pal, box, sunInfo, moonInfo);
-    else this._drawArtTerrain(pal);
+    /* terrain — drawn last so it occludes sun, moon and stars */
+    if (ready) this._drawTerrain(A, pal, box, sunInfo, moonInfo);
   },
 
-  _terrainBox() {
-    const iw = this.terrainImg.naturalWidth, ih = this.terrainImg.naturalHeight;
+  _terrainBox(img) {
+    const iw = img.naturalWidth, ih = img.naturalHeight;
     const s = Math.max(this.W / iw, this.H / ih);
     return { dx: (this.W - iw * s) / 2, dy: this.H - ih * s, dw: iw * s, dh: ih * s };
   },
 
-  _ridgeYat(fx, box) {
-    if (!this.ridge) return this.H * 0.6;
+  _ridgeYat(A, fx, box) {
+    if (!A.ridge) return this.H * 0.6;
     const imgFx = this._clamp((fx * this.W - box.dx) / box.dw, 0, 1);
-    return box.dy + this.ridge[this._clamp(Math.round(imgFx * 127), 0, 127)] * box.dh;
+    return box.dy + A.ridge[this._clamp(Math.round(imgFx * 127), 0, 127)] * box.dh;
   },
 
-  _drawPhotoTerrain(pal, box, sunInfo, moonInfo) {
+  _drawTerrain(A, pal, box, sunInfo, moonInfo) {
     const { octx, W, H } = this;
     const dayness = this._clamp((pal.amb - 0.16) / 0.84, 0, 1);
     octx.clearRect(0, 0, W, H);
     octx.filter = `brightness(${(0.36 + 0.72 * dayness).toFixed(3)}) saturate(${(0.55 + 0.55 * dayness).toFixed(3)})`;
-    octx.drawImage(this.terrainImg, box.dx, box.dy, box.dw, box.dh);
+    octx.drawImage(A.img, box.dx, box.dy, box.dw, box.dh);
     octx.filter = 'none';
     octx.globalCompositeOperation = 'source-atop';
     octx.fillStyle = `rgba(16,26,58,${(0.45 * (1 - dayness)).toFixed(3)})`;
@@ -249,7 +252,7 @@ const Scene = {
       const wa = sunInfo.warm;
       octx.fillStyle = `rgba(255,150,70,${(0.14 * wa).toFixed(3)})`;
       octx.fillRect(0, 0, W, H);
-      const ry = this._ridgeYat(sunInfo.sx / W, box);
+      const ry = this._ridgeYat(A, sunInfo.sx / W, box);
       const wg = octx.createRadialGradient(sunInfo.sx, ry, 0, sunInfo.sx, ry, H * 0.5);
       wg.addColorStop(0, `rgba(255,180,90,${(0.34 * wa).toFixed(3)})`);
       wg.addColorStop(1, 'rgba(255,180,90,0)');
@@ -257,7 +260,7 @@ const Scene = {
       octx.fillRect(0, ry - H * 0.02, W, H);
     }
     if (moonInfo) {
-      const ry = this._ridgeYat(moonInfo.mx / W, box);
+      const ry = this._ridgeYat(A, moonInfo.mx / W, box);
       const mgw = octx.createRadialGradient(moonInfo.mx, ry, 0, moonInfo.mx, ry, H * 0.4);
       mgw.addColorStop(0, 'rgba(200,215,255,0.20)');
       mgw.addColorStop(1, 'rgba(200,215,255,0)');
@@ -266,64 +269,5 @@ const Scene = {
     }
     octx.globalCompositeOperation = 'source-over';
     this.ctx.drawImage(this.off, 0, 0, W, H);
-  },
-
-  _drawArtTerrain(pal) {
-    const { ctx, W, H } = this;
-    const RIDGE_DAY = ['#9db9d8', '#6e93bb', '#3f6790', '#24425f'];
-    const RIDGE_NIGHT = ['#182238', '#111a2c', '#0a1220', '#050b16'];
-    const dayness = this._clamp((pal.amb - 0.16) / 0.84, 0, 1);
-    this.artRidges.forEach((layer, idx) => {
-      const base = this._mixHex(RIDGE_NIGHT[idx], RIDGE_DAY[idx], dayness);
-      const color = this._mixHex(base, pal.hor, layer.haze);
-      const pts = layer.pts.map(([x, y]) => [x * W, y * H]);
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < pts.length - 1; i++) {
-        ctx.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2);
-      }
-      ctx.lineTo(pts.at(-1)[0], pts.at(-1)[1]);
-      ctx.lineTo(W, H); ctx.lineTo(0, H);
-      ctx.closePath();
-      const topY = Math.min(...pts.map(p => p[1]));
-      const g = ctx.createLinearGradient(0, topY, 0, H);
-      g.addColorStop(0, color);
-      g.addColorStop(1, this._mixHex(color, '#000000', 0.35));
-      ctx.fillStyle = g;
-      ctx.fill();
-    });
-
-    if (this.theme === 'mosque') this._drawMosque(pal, dayness);
-  },
-
-  _drawMosque(pal, dayness) {
-    const { ctx, W, H } = this;
-    const color = this._mixHex(this._mixHex('#050b16', '#24425f', dayness * 0.6), pal.hor, 0.06);
-    /* keep the mosque visible beside the content column on wide screens */
-    const cx = W > 900 ? W * 0.85 : W * 0.72;
-    const baseY = H * 0.86, u = Math.min(W, H) * 0.0011;
-    ctx.fillStyle = color;
-    const rect = (x, y, w, h) => ctx.fillRect(cx + x * u, baseY + y * u, w * u, h * u);
-    const dot = (x, y, r) => { ctx.beginPath(); ctx.arc(cx + x * u, baseY + y * u, r * u, 0, 7); ctx.fill(); };
-    /* main hall + dome */
-    rect(-95, -34, 190, 34);
-    ctx.beginPath();
-    ctx.moveTo(cx - 52 * u, baseY - 34 * u);
-    ctx.bezierCurveTo(cx - 52 * u, baseY - 92 * u, cx + 52 * u, baseY - 92 * u, cx + 52 * u, baseY - 34 * u);
-    ctx.closePath(); ctx.fill();
-    dot(0, -95, 4); rect(-1, -114, 2, 16);
-    /* minarets */
-    for (const mx of [-120, 120]) {
-      rect(mx - 4, -120, 8, 120);
-      dot(mx, -124, 7);
-      rect(mx - 1, -142, 2, 12);
-    }
-    /* side domes */
-    for (const sx of [-75, 75]) {
-      ctx.beginPath();
-      ctx.moveTo(cx + (sx - 18) * u, baseY - 34 * u);
-      ctx.quadraticCurveTo(cx + sx * u, baseY - 62 * u, cx + (sx + 18) * u, baseY - 34 * u);
-      ctx.closePath(); ctx.fill();
-    }
   }
 };

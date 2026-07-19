@@ -42,6 +42,7 @@
       <button data-tab="athan" class="active">Athan</button>
       <button data-tab="schedule">Schedule</button>
       <button data-tab="quran">Quran</button>
+      <button data-tab="install">Install</button>
       <button data-tab="activity">Activity</button>
       <button data-tab="settings">Settings</button>
     </nav>
@@ -110,6 +111,47 @@
       </div>
     </section>
 
+    <section class="panel" id="panel-install">
+      <div class="card">
+        <h3>Install the Desktop App</h3>
+        <p class="hint" style="margin-top:0">This website works everywhere with nothing to install — but for a
+          permanent, always-on athan (menu-bar icon, auto-start when the computer turns on), you can install the
+          desktop application. Pick your system below; each link opens the exact step-by-step instructions on GitHub.</p>
+        <ul class="install-list">
+          <li><a href="https://github.com/aparsi0/athan_app#-install-as-a-menu-bar-app-with-auto-start-macos--recommended" target="_blank" rel="noopener">
+            <span class="inst-icon">🌙</span>
+            <span class="inst-text"><strong>macOS — Menu-Bar App with Auto-Start</strong><span>Recommended. The green crescent in the menu bar, starts at every login, keeps the Mac awake.</span></span>
+            <span class="inst-go">↗</span></a></li>
+          <li><a href="https://github.com/aparsi0/athan_app#macbook-m1--m2--m3" target="_blank" rel="noopener">
+            <span class="inst-icon"></span>
+            <span class="inst-text"><strong>MacBook M1 / M2 / M3 (Apple Silicon)</strong><span>Terminal setup from scratch — Homebrew, Python, VLC (arm64 warning included).</span></span>
+            <span class="inst-go">↗</span></a></li>
+          <li><a href="https://github.com/aparsi0/athan_app#imac--macbook-intel" target="_blank" rel="noopener">
+            <span class="inst-icon">🖥</span>
+            <span class="inst-text"><strong>iMac / MacBook Intel</strong><span>Terminal setup for Intel Macs.</span></span>
+            <span class="inst-go">↗</span></a></li>
+          <li><a href="https://github.com/aparsi0/athan_app#windows-10--11" target="_blank" rel="noopener">
+            <span class="inst-icon">🪟</span>
+            <span class="inst-text"><strong>Windows 10 / 11</strong><span>Python + VLC setup in PowerShell.</span></span>
+            <span class="inst-go">↗</span></a></li>
+          <li><a href="https://github.com/aparsi0/athan_app#as-a-system-service-linux" target="_blank" rel="noopener">
+            <span class="inst-icon">🐧</span>
+            <span class="inst-text"><strong>Linux</strong><span>Run as a systemd user service.</span></span>
+            <span class="inst-go">↗</span></a></li>
+          <li><a href="https://github.com/aparsi0/athan_app#run-automatically-on-macos-with-launchd-headless--no-menu-bar-icon" target="_blank" rel="noopener">
+            <span class="inst-icon">⚙️</span>
+            <span class="inst-text"><strong>macOS headless (no menu-bar icon)</strong><span>Background-only variant via launchd.</span></span>
+            <span class="inst-go">↗</span></a></li>
+          <li><a href="https://github.com/aparsi0/athan_app#verify-installation" target="_blank" rel="noopener">
+            <span class="inst-icon">✅</span>
+            <span class="inst-text"><strong>Verify your installation</strong><span>Test that audio, prayer times and scheduling all work.</span></span>
+            <span class="inst-go">↗</span></a></li>
+        </ul>
+        <p class="hint">📱 On phones there is nothing to install: open this site and use your browser's
+          <strong>“Add to Home Screen”</strong> / <strong>“Install”</strong> — it becomes an app with its own icon.</p>
+      </div>
+    </section>
+
     <section class="panel" id="panel-activity">
       <div class="card">
         <h3>Activity</h3>
@@ -121,12 +163,13 @@
       <div class="card">
         <h3>Settings</h3>
         <div class="settings-body">
-          <h4>Theme</h4>
+          <h4>Theme — living landscapes</h4>
           <div class="theme-grid">
-            <label class="theme-opt"><input type="radio" name="theme" value="lake" /> 🏞 Lake<span>Real photo, living light</span></label>
-            <label class="theme-opt"><input type="radio" name="theme" value="ridges" /> 🏔 Ridges<span>Layered art mountains</span></label>
-            <label class="theme-opt"><input type="radio" name="theme" value="mosque" /> 🕌 Mosque<span>Silhouette skyline</span></label>
-            <label class="theme-opt"><input type="radio" name="theme" value="classic" /> 🌌 Classic<span>Plain dark</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="a" /> 🏔 A · Alpine Valley<span>Snowy peaks, pine forest &amp; clouds</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="b" /> ☁️ B · Above the Clouds<span>Summits over a sea of clouds</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="c" /> 🛶 C · Mountain Lake<span>Boat bow on turquoise water</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="d" /> 🌅 D · Lake Dock<span>Calm lake &amp; pine shoreline (default)</span></label>
+            <label class="theme-opt"><input type="radio" name="theme" value="e" /> 🌄 E · Golden Valley<span>Sunlit green highlands</span></label>
           </div>
 
           <h4>Prayers</h4>

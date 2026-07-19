@@ -41,7 +41,12 @@
       "Bash(chmod +x /Users/apa/Desktop/athan_app/macos/install_menubar_agent.sh)",
       "Bash(bash -n /Users/apa/Desktop/athan_app/macos/install_menubar_agent.sh)",
       "Bash(plutil -lint /Users/apa/Desktop/athan_app/macos/com.apa.athan-menubar.plist)",
-      "Bash(git commit -m 'README: step-by-step menu-bar app install with auto-start \\(macOS\\); add install_menubar_agent.sh *)"
+      "Bash(git commit -m 'README: step-by-step menu-bar app install with auto-start \\(macOS\\); add install_menubar_agent.sh *)",
+      "Bash(./imgenv/bin/python segment.py)",
+      "Bash(cp /Users/apa/Desktop/athan_app/docs/assets/terrain.png /Users/apa/Desktop/athan_app/docs/assets/terrain_d.png)",
+      "Bash(cp /Users/apa/Desktop/athan_app/docs/assets/ridge.json /Users/apa/Desktop/athan_app/docs/assets/ridge_d.json)",
+      "Bash(curl -s \"https://github.com/aparsi0/athan_app\" -H \"User-Agent: Mozilla/5.0\")",
+      "Bash(git rm *)"
     ]
   }
 }

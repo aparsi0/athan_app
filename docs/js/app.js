@@ -6,8 +6,12 @@ const App = {
 
   async init() {
     Config.load();
+    // migrate old theme values (lake/ridges/mosque/classic) to the photo set
+    if (!['a', 'b', 'c', 'd', 'e'].includes(Config.get('ui_settings.theme', 'd'))) {
+      Config.set('ui_settings.theme', 'd');
+    }
     Scene.init();
-    Scene.setTheme(Config.get('ui_settings.theme', 'lake'));
+    Scene.setTheme(Config.get('ui_settings.theme', 'd'));
     this.bindUI();
     this.logStatus('Starting Athan Web…');
 
@@ -296,7 +300,7 @@ const App = {
     document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
     document.getElementById('resetSettings').addEventListener('click', () => {
       Config.reset();
-      Scene.setTheme(Config.get('ui_settings.theme', 'lake'));
+      Scene.setTheme(Config.get('ui_settings.theme', 'd'));
       this.openSettings();
       this.logStatus('Settings reset to defaults.');
     });
@@ -333,7 +337,7 @@ const App = {
 
   openSettings() {
     // Theme
-    const theme = Config.get('ui_settings.theme', 'lake');
+    const theme = Config.get('ui_settings.theme', 'd');
     document.querySelectorAll('input[name="theme"]').forEach((r) => { r.checked = r.value === theme; });
 
     // Prayers

@@ -3,7 +3,7 @@
  * and caches audio files the first time they play.
  * Bump CACHE_VERSION when deploying changes to force clients to update.
  */
-const CACHE_VERSION = 'athan-web-v7';
+const CACHE_VERSION = 'athan-web-v8';
 const APP_SHELL = [
   '.',
   'index.html',
@@ -17,9 +17,7 @@ const APP_SHELL = [
   'js/scheduler.js',
   'js/app.js',
   'manifest.webmanifest',
-  'assets/icons/icon.svg',
-  'assets/ridge.json',
-  'assets/terrain.png'
+  'assets/icons/icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -42,8 +40,10 @@ self.addEventListener('fetch', (event) => {
   // Never cache API calls — prayer times and location must stay fresh.
   if (url.origin !== self.location.origin) return;
 
-  // Audio: cache-first with runtime fill (files are large and immutable).
-  if (url.pathname.includes('/assets/audio/')) {
+  // Assets (audio, theme terrains, skyline data): cache-first with runtime
+  // fill — large, immutable files cached only once actually used, so
+  // visitors don't pre-download all five theme photos.
+  if (url.pathname.includes('/assets/')) {
     event.respondWith(
       caches.match(event.request).then(
         (hit) => hit || fetch(event.request).then((res) => {
