@@ -150,12 +150,17 @@ Prototyped in `demo/` (kept for reference; not deployed), then shipped to `docs/
   Draw order sky → stars → sun/moon(+glow) → terrain, so celestial bodies rise/set
   BEHIND the landscape and stars are occluded by it. Sun is a warm bloom near the
   horizon, subtle glare at midday; moon is a crescent sprite; light reflects on water.
-- **Four themes**, selectable in Settings, saved per-visitor (`ui_settings.theme`):
-  `lake` (default; real photograph with its sky segmented out — assets/terrain.png +
-  assets/ridge.json treeline profile, macOS-dynamic-wallpaper technique; source photo:
-  Unsplash 1439066615861, lake + pine treeline + dock), `ridges` (Big Sur-style layered
-  art), `mosque` (art ridges + mosque silhouette, drawn right-of-center to stay visible),
-  `classic` (original plain dark, no canvas).
+- **Themes = exactly five real-photo landscapes** (user's choice, replacing the earlier
+  art/classic set; old saved values migrate to `d`). Values `a`–`e` in `ui_settings.theme`,
+  assets `terrain_X.png` + `ridge_X.json`, lazy-loaded per selected theme (sw v8 caches
+  them at runtime, not precache). Source photos (Unsplash): a=1464822759023 Alpine Valley,
+  b=1458668383970 Above the Clouds, c=1476514525535 Mountain Lake (boat), d=1439066615861
+  Lake Dock (default), e=1469474968028 Golden Valley. Segmentation: per-column vertical-
+  smoothness scan; d uses the precise blue-sky method (tree-tip detail); a/b/e use a
+  windowed low-quantile skyline envelope (clouds kept as terrain in a).
+- **Install tab** on the site: per-platform cards (🌙 macOS menu-bar,  M1/2/3, 🖥 Intel,
+  🪟 Windows, 🐧 Linux, ⚙️ headless, ✅ verify) hyperlinking to the exact GitHub README
+  anchors (verified against GitHub's rendered ids), plus phone add-to-home-screen note.
 - **Quran tab**: audio-style player (⏮ ⏯ ⏭ + 114-surah list, auto-advance, skip on embed
   error) controlling a minimized corner YouTube player (YouTube requires its player to be
   visible; tap to enlarge). Global object still named `Podcast` — the athan pipeline calls
