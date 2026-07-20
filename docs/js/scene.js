@@ -1,248 +1,373 @@
 /**
- * Living scene engine — the Lake Dock landscape (the only theme), rendered
- * macOS-dynamic-wallpaper style: the photograph's sky is transparent
- * (assets/terrain_d.png + treeline profile assets/ridge_d.json), and the
- * engine draws its own sky BEHIND the real terrain, driven by the
- * visitor's real sun/prayer times.
+ * Scene — 19-image live day/night sky, anchored to SOLAR moments.
+ * ---------------------------------------------------------------------------
+ * Self-contained vanilla JS. No frameworks, no build step, no CDNs.
+ * Renders 19 hand-painted skies (assets/sky_01.jpg … sky_19.jpg, same
+ * composition, only the light changes) into a fixed full-screen <canvas
+ * id="scene"> that sits BEHIND the page content, cross-fading continuously
+ * between the two images that bracket the current instant so the whole day
+ * reads as one flowing animation.
  *
- * Draw order: sky → stars → sun/moon (+their glow) → photo terrain, so the
- * sun and moon rise from and set behind the treeline, stars are occluded
- * by it, and their light reflects on the water.
+ * PUBLIC API (all image timing derives from these):
+ *   Scene.init()
+ *   Scene.setTimes({ fajr, sunrise, dhuhr, asr, maghrib, isha })  // minutes
+ *                                                                 // since midnight
+ *
+ * IMAGE ↔ SOLAR MAP (01 = deepest night … 19 = late night, then wraps to 01):
+ *   01 deep night (mid Isha→Fajr)     11 early afternoon (noon→sunset 25%)
+ *   02 late night (75% → Fajr)        12 mid-afternoon (40%)
+ *   03 Fajr — first light             13 late afternoon (60%)
+ *   04 dawn (mid Fajr→sunrise)        14 golden hour (~80%)
+ *   05 sunrise                        15 just before sunset (96%)
+ *   06 morning (sunrise→noon 25%)     16 sunset (Maghrib)
+ *   07 morning (50%)                  17 dusk (mid sunset→Isha)
+ *   08 late morning (75%)             18 Isha — nightfall
+ *   09 approaching noon (95%)         19 night (Isha + ~1h)
+ *   10 solar noon (Dhuhr)
+ *
+ * Overlays (drawn at runtime, kept subtle so they never fight the paintings):
+ *   drifting clouds by day · twinkling stars + occasional shooting star at
+ *   night · birds at dawn/dusk · gentle light shimmer on the water.
+ * Performance: only the current + next image are fetched (never all 19);
+ *   requestAnimationFrame; rendering pauses while the tab is hidden.
  */
 const Scene = {
-  times: { fajr: 285, sunrise: 370, dhuhr: 801, asr: 1030, maghrib: 1231, isha: 1316 },
-  canvas: null, ctx: null, off: null, octx: null,
-  W: 0, H: 0, DPR: 1,
-  stars: [],
-  terrainImg: null, ridge: null, ridgeMax: 0.4,
+  IMG_COUNT: 19,
+  IMG_PATH: i => `assets/sky_${String(i).padStart(2, '0')}.jpg`,
 
+  // Fallback prayer times (minutes since midnight) until the app calls setTimes.
+  times: { fajr: 300, sunrise: 372, dhuhr: 786, asr: 1005, maghrib: 1200, isha: 1290 },
+
+  canvas: null, ctx: null, W: 0, H: 0, DPR: 1,
+  cache: {}, anchors: [], t0: 0, raf: 0, paused: false,
+  stars: [], clouds: [], shoot: null, nextShoot: 6,
+
+  /* ============================ INIT ============================ */
   init() {
     this.canvas = document.getElementById('scene');
     if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
-    this.off = document.createElement('canvas');
-    this.octx = this.off.getContext('2d');
+    this.t0 = performance.now();
 
-    this.terrainImg = new Image();
-    this.terrainImg.src = 'assets/terrain_d.png';
-    this.terrainImg.onload = () => this.render();
-    fetchWithTimeout('assets/ridge_d.json', 15000)
-      .then(r => r.json())
-      .then(d => { this.ridge = d; this.ridgeMax = Math.max.apply(null, d); this.render(); })
-      .catch(() => {});
+    this._buildAnchors();
 
-    let seed = 42;
-    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    this.stars = Array.from({ length: 170 }, () => ({
-      x: rnd(), y: rnd() * 0.62, r: rnd() * 1.2 + 0.25, tw: rnd() * 6.28, a: rnd() * 0.6 + 0.4
-    }));
+    // Deterministic overlay fields.
+    let s1 = 42; const r1 = () => (s1 = (s1 * 16807) % 2147483647) / 2147483647;
+    this.stars = Array.from({ length: 170 }, () => ({ x: r1(), y: r1() * 0.5, r: r1() * 1.2 + 0.2, tw: r1() * 6.28, a: r1() * 0.5 + 0.4 }));
+    let s2 = 7; const r2 = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+    this.clouds = Array.from({ length: 6 }, () => ({ x: r2(), y: 0.07 + r2() * 0.26, s: 0.7 + r2() * 1.0, sp: 0.0025 + r2() * 0.006, p: r2() }));
 
     this.resize();
-    addEventListener('resize', () => { this.resize(); this.render(); });
+    addEventListener('resize', () => this.resize());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this.render();
+      this.paused = document.hidden;
+      if (!this.paused) { this.t0 = performance.now() - this._elapsed; this._loop(); }
     });
-    setInterval(() => this.render(), 30000);
-    this.render();
+
+    this._loop();
   },
 
   setTimes(map) {
-    for (const k of Object.keys(map)) {
-      if (Number.isFinite(map[k])) this.times[k] = map[k];
-    }
-    this.render();
+    for (const k of Object.keys(map || {})) if (Number.isFinite(map[k])) this.times[k] = map[k];
+    this._buildAnchors();
   },
 
   resize() {
+    const c = this.canvas; if (!c) return;
     this.DPR = Math.min(2, window.devicePixelRatio || 1);
     this.W = innerWidth; this.H = innerHeight;
-    for (const [c, cx] of [[this.canvas, this.ctx], [this.off, this.octx]]) {
-      c.width = this.W * this.DPR; c.height = this.H * this.DPR;
-      cx.setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
-    }
-    this.canvas.style.width = this.W + 'px';
-    this.canvas.style.height = this.H + 'px';
+    c.width = this.W * this.DPR; c.height = this.H * this.DPR;
+    c.getContext('2d').setTransform(this.DPR, 0, 0, this.DPR, 0, 0);
+    c.style.width = this.W + 'px'; c.style.height = this.H + 'px';
   },
 
-  /* ---------- palette ---------- */
-  _lerp(a, b, t) { return a + (b - a) * t; },
-  _clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); },
-  _rgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; },
-  _mixHex(h1, h2, t) {
-    const a = this._rgb(h1), b = this._rgb(h2);
-    return '#' + [0, 1, 2].map(i => Math.round(this._lerp(a[i], b[i], t)).toString(16).padStart(2, '0')).join('');
-  },
-  _mixC(h1, h2, t) {
-    const a = this._rgb(h1), b = this._rgb(h2);
-    return `rgb(${Math.round(this._lerp(a[0], b[0], t))},${Math.round(this._lerp(a[1], b[1], t))},${Math.round(this._lerp(a[2], b[2], t))})`;
-  },
-
-  _anchors() {
-    const T = this.times, mid = (a, b) => (a + b) / 2;
-    return [
-      [T.fajr - 90,            '#040711', '#070c1a', '#0b1326', 0.16, 'Deep night'],
-      [T.fajr,                 '#0a1228', '#161f3c', '#3c3a58', 0.26, 'Fajr — first light'],
-      [mid(T.fajr, T.sunrise), '#152048', '#333a6e', '#b06a4e', 0.42, 'Dawn'],
-      [T.sunrise,              '#2b4a7c', '#7a7ba9', '#f5a55c', 0.60, 'Sunrise'],
-      [T.sunrise + 50,         '#4a7ab8', '#8bacd2', '#f7cc90', 0.82, 'Morning'],
-      [T.dhuhr,                '#3f88d5', '#79b5e8', '#d3e8f8', 1.00, 'Midday'],
-      [T.asr,                  '#3d7ec8', '#83b1e1', '#ead9a9', 0.93, 'Afternoon'],
-      [T.maghrib - 50,         '#3a62a2', '#9c88a2', '#f5ad62', 0.76, 'Golden hour'],
-      [T.maghrib,              '#253560', '#7c5a7a', '#ee6f3c', 0.52, 'Sunset'],
-      [mid(T.maghrib, T.isha), '#101a3a', '#343060', '#7c465e', 0.36, 'Dusk'],
-      [T.isha,                 '#070c1e', '#101632', '#1e2446', 0.24, 'Night falls'],
-      [T.isha + 80,            '#040711', '#070c1a', '#0b1326', 0.16, 'Night']
-    ];
-  },
-
-  paletteAt(minute) {
-    const A = this._anchors();
-    let m = minute;
-    if (m < A[0][0]) m += 1440;
-    let i = 0;
-    while (i < A.length - 1 && m >= A[i + 1][0]) i++;
-    if (i >= A.length - 1) i = A.length - 2;
-    const t = this._clamp((m - A[i][0]) / Math.max(1, A[i + 1][0] - A[i][0]), 0, 1);
-    const P = A[i], Q = A[i + 1];
-    return {
-      top: this._mixHex(P[1], Q[1], t), mid: this._mixHex(P[2], Q[2], t), hor: this._mixHex(P[3], Q[3], t),
-      amb: this._lerp(P[4], Q[4], t), phase: t < 0.5 ? P[5] : Q[5]
+  /* ============================ SOLAR ANCHORS ============================ */
+  // Build 19 anchor times on a monotonic timeline that starts at Fajr and runs
+  // one full solar day to Fajr+1440. Night images (18,19,1,2) live in the
+  // Isha→next-Fajr gap, so the sequence never goes backwards.
+  _buildAnchors() {
+    const T = this.times;
+    const F = T.fajr, SR = T.sunrise, N = T.dhuhr, MG = T.maghrib, I = T.isha;
+    const nextF = F + 1440;
+    const lerp = (a, b, t) => a + (b - a) * t;
+    // index -> absolute minute on the [F, F+1440] timeline
+    const at = {
+      3: F,
+      4: (F + SR) / 2,
+      5: SR,
+      6: lerp(SR, N, 0.25),
+      7: lerp(SR, N, 0.50),
+      8: lerp(SR, N, 0.75),
+      9: lerp(SR, N, 0.95),
+      10: N,
+      11: lerp(N, MG, 0.25),
+      12: lerp(N, MG, 0.40),
+      13: lerp(N, MG, 0.60),
+      14: lerp(N, MG, 0.80),
+      15: lerp(N, MG, 0.96),
+      16: MG,
+      17: (MG + I) / 2,
+      18: I,
+      19: I + 60,
+      1: (I + nextF) / 2,
+      2: lerp(I, nextF, 0.75)
     };
+    // Ordered sequence (image index + time), Fajr → … → Fajr+1440 (wrap = img 3).
+    const order = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 1, 2];
+    this.anchors = order.map(i => ({ i, t: at[i] }));
+    this.anchors.push({ i: 3, t: nextF }); // wrap sentinel
+    this._fajr = F;
+  },
+
+  // Returns { a, b, frac, ci } — bracketing image indices, blend fraction, and
+  // a continuous position (0..19) used to drive the overlays.
+  _position(nowMin) {
+    const F = this._fajr;
+    let t = nowMin;
+    if (t < F) t += 1440;                 // pre-dawn belongs to previous night
+    if (t >= F + 1440) t -= 1440;
+    const A = this.anchors;
+    for (let k = 0; k < A.length - 1; k++) {
+      if (t >= A[k].t && t <= A[k + 1].t) {
+        const span = A[k + 1].t - A[k].t || 1;
+        const raw = (t - A[k].t) / span;
+        const frac = raw * raw * (3 - 2 * raw); // smoothstep
+        return { a: A[k].i, b: A[k + 1].i, frac, ci: k + raw };
+      }
+    }
+    return { a: 1, b: 1, frac: 0, ci: 0 };
+  },
+
+  /* ============================ IMAGE CACHE (current + next only) ============================ */
+  _img(idx) {
+    let e = this.cache[idx];
+    if (!e) {
+      const im = new Image();
+      e = this.cache[idx] = { im, ready: false };
+      im.onload = () => { e.ready = true; };
+      im.decoding = 'async';
+      im.src = this.IMG_PATH(idx);
+    }
+    return e;
+  },
+  // Keep only the two active images resident (plus a tiny grace set), so we
+  // never hold all 19 at once.
+  _evictExcept(keep) {
+    for (const k of Object.keys(this.cache)) {
+      if (!keep.includes(+k)) delete this.cache[k];
+    }
+  },
+
+  /* ============================ MATH ============================ */
+  _clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); },
+  _smooth(a, b, x) { const t = this._clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); },
+  _gauss(x, mu, sig) { const d = (x - mu) / sig; return Math.exp(-d * d); },
+
+  _phaseName(ci) {
+    const names = {
+      1: 'Night', 2: 'Late night', 3: 'Fajr — first light', 4: 'Dawn', 5: 'Sunrise',
+      6: 'Morning', 7: 'Morning', 8: 'Late morning', 9: 'Late morning', 10: 'Midday',
+      11: 'Early afternoon', 12: 'Afternoon', 13: 'Late afternoon', 14: 'Golden hour',
+      15: 'Golden hour', 16: 'Sunset', 17: 'Dusk', 18: 'Nightfall', 19: 'Night'
+    };
+    // nearest anchor in the ordered sequence
+    const A = this.anchors, k = Math.round(this._clamp(ci, 0, A.length - 1));
+    return names[A[k] ? A[k].i : 1] || '';
+  },
+
+  /* ============================ LOOP ============================ */
+  _loop() {
+    cancelAnimationFrame(this.raf);
+    const step = () => {
+      if (this.paused) return;
+      this._elapsed = performance.now() - this.t0;
+      this.render();
+      this.raf = requestAnimationFrame(step);
+    };
+    step();
   },
 
   _nowMinutes() {
+    if (Number.isFinite(this._debugMinutes)) return this._debugMinutes;
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
   },
 
-  /* ---------- render ---------- */
+  /* ============================ RENDER ============================ */
   render() {
     if (!this.ctx) return;
-    const minute = this._nowMinutes();
-    const pal = this.paletteAt(minute);
-    const phaseEl = document.getElementById('phaseText');
-    if (phaseEl) phaseEl.textContent = pal.phase;
+    const { ctx, W, H } = this;
+    const time = (performance.now() - this.t0) / 1000;
+    const nowMin = this._nowMinutes();
 
-    const { ctx, W, H, times: T } = this;
+    // Deep-night HOLD (23:00–01:00): show one fixed painting only, so the
+    // cross-fade between two moon paintings can't put two moons in the sky.
+    const clock = ((nowMin % 1440) + 1440) % 1440;
+    if (clock >= 1380 || clock < 60) {
+      const hold = this._holdImg();
+      ctx.clearRect(0, 0, W, H);
+      if (hold.ready) { ctx.globalAlpha = 1; this._cover(hold.im); }
+      else { ctx.fillStyle = '#0a1326'; ctx.fillRect(0, 0, W, H); }
+      this._overlays(ctx, time, nowMin, 0.5); // stars/shimmer only at this hour
+      this._readout(nowMin, 0.5, 'Night');
+      return;
+    }
+
+    const pos = this._position(nowMin);
+
+    // Only fetch the two active frames; drop the rest.
+    const cur = this._img(pos.a), nxt = this._img(pos.b);
+    this._evictExcept([pos.a, pos.b]);
+
     ctx.clearRect(0, 0, W, H);
+    if (cur.ready) { ctx.globalAlpha = 1; this._cover(cur.im); }
+    else { ctx.fillStyle = '#0a1326'; ctx.fillRect(0, 0, W, H); }
+    if (nxt.ready && pos.b !== pos.a && pos.frac > 0.001) {
+      ctx.globalAlpha = pos.frac; this._cover(nxt.im); ctx.globalAlpha = 1;
+    }
 
-    /* sky */
-    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.9);
-    sky.addColorStop(0, pal.top); sky.addColorStop(0.55, pal.mid); sky.addColorStop(1, pal.hor);
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
+    this._overlays(ctx, time, nowMin, pos.ci);
+    this._readout(nowMin, pos.ci);
+  },
 
-    /* stars */
-    const starA = this._clamp((0.38 - pal.amb) / 0.22, 0, 1);
-    if (starA > 0) {
+  _cover(img) {
+    const { ctx, W, H } = this;
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    if (!iw) return;
+    const s = Math.max(W / iw, H / ih);
+    const w = iw * s, h = ih * s;
+    ctx.drawImage(img, (W - w) / 2, (H - h) * 0.5, w, h);
+  },
+
+  _holdImg() {
+    if (!this._hold) {
+      const im = new Image();
+      this._hold = { im, ready: false };
+      im.onload = () => { this._hold.ready = true; };
+      im.decoding = 'async';
+      im.src = 'assets/sky_night_hold.jpg';
+    }
+    return this._hold;
+  },
+
+  /* ---------- overlays (all subtle) ---------- */
+  _overlays(ctx, t, nowMin, ci) {
+    const { W, H } = this;
+    const T = this.times, F = T.fajr, SR = T.sunrise, MG = T.maghrib, I = T.isha;
+
+    // Night factor for stars (dark sky only).
+    let night = 0;
+    if (nowMin >= MG) night = this._smooth(MG + 10, I + 30, nowMin);
+    else if (nowMin <= SR) night = 1 - this._smooth(F - 20, SR, nowMin);
+    const day = this._clamp(this._smooth(SR - 10, SR + 55, nowMin) * (1 - this._smooth(MG - 55, MG + 10, nowMin)), 0, 1);
+    const dt = Math.min(0.1, t - (this._prevT == null ? t : this._prevT)); // seconds since last frame (clamped for tab resume)
+    this._prevT = t;
+
+    // Stars (upper sky), very light so painted stars stay dominant.
+    if (night > 0.04) {
       for (const s of this.stars) {
-        ctx.globalAlpha = starA * s.a * (0.75 + 0.25 * Math.sin(minute * 0.5 + s.tw));
-        ctx.fillStyle = '#e9eeff';
-        ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 7); ctx.fill();
+        ctx.globalAlpha = night * s.a * (0.4 + 0.6 * Math.abs(Math.sin(t * 1.4 + s.tw))) * 0.5;
+        ctx.fillStyle = '#eaf0ff';
+        ctx.beginPath(); ctx.arc(s.x * W, s.y * H * 0.9, s.r, 0, 7); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // Shooting star: one every ~30s across the whole night (after Maghrib →
+      // before sunrise), each with a fresh random direction.
+      this.nextShoot -= dt;
+      if (!this.shoot && this.nextShoot <= 0) {
+        const fromLeft = Math.random() < 0.5;
+        const ang = 0.15 + Math.random() * 0.5;                  // downward slope
+        const speed = W * (0.5 + Math.random() * 0.35);          // px/sec
+        this.shoot = {
+          x: fromLeft ? -W * 0.05 + Math.random() * W * 0.3 : W * 1.05 - Math.random() * W * 0.3,
+          y: Math.random() * H * 0.35,
+          vx: (fromLeft ? 1 : -1) * Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed, life: 0
+        };
+        this.nextShoot = 30;
+      }
+      if (this.shoot) {
+        const sh = this.shoot; sh.life += dt; sh.x += sh.vx * dt; sh.y += sh.vy * dt;
+        const p = sh.life / 0.8;
+        if (p >= 1 || sh.x < -W * 0.2 || sh.x > W * 1.2) this.shoot = null;
+        else {
+          const mag = Math.hypot(sh.vx, sh.vy) || 1, tail = 92;
+          const tx = sh.x - sh.vx / mag * tail, ty = sh.y - sh.vy / mag * tail;
+          const g = ctx.createLinearGradient(tx, ty, sh.x, sh.y);
+          const a = Math.max(night, 0.6) * (1 - p) * 0.95;
+          g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, `rgba(255,255,255,${a.toFixed(2)})`);
+          ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(sh.x, sh.y); ctx.stroke();
+        }
+      }
+    }
+
+    // Drifting clouds by day — faint wisps that add motion without hiding art.
+    if (day > 0.08) {
+      for (const cl of this.clouds) {
+        cl.x += cl.sp / 60; if (cl.x > 1.3) cl.x = -0.3;
+        const cx = cl.x * W, cy = cl.y * H, sc = cl.s * H * 0.05;
+        ctx.globalAlpha = day * (0.05 + 0.05 * cl.p);
+        for (const [ox, oy, r] of [[-1.5, 0.2, 1], [-0.6, -0.3, 1.2], [0.5, -0.2, 1.35], [1.5, 0.15, 1], [0, 0.3, 1.5]]) {
+          const g = ctx.createRadialGradient(cx + ox * sc, cy + oy * sc, 0, cx + ox * sc, cy + oy * sc, r * sc);
+          g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx + ox * sc, cy + oy * sc, r * sc, 0, 7); ctx.fill();
+        }
       }
       ctx.globalAlpha = 1;
     }
 
-    /* horizon geometry from the real treeline */
-    const ready = this.terrainImg.complete && this.terrainImg.naturalWidth > 0;
-    const box = ready ? this._terrainBox() : null;
-    const horizonY = ready && this.ridge
-      ? box.dy + this.ridgeMax * box.dh + H * 0.06
-      : H * 0.7;
-    const peakY = Math.min(H * 0.24, horizonY - H * 0.3);
-    const arc = (f) => [this._lerp(W * 0.07, W * 0.93, f), horizonY - Math.sin(Math.PI * f) * (horizonY - peakY)];
-
-    /* sun — dramatic warm bloom near the horizon, subtle glare high up */
-    let sunInfo = null, moonInfo = null;
-    if (minute >= T.sunrise - 40 && minute <= T.maghrib + 40) {
-      const frac = (minute - T.sunrise) / (T.maghrib - T.sunrise);
-      const [sx, sy] = arc(this._clamp(frac, -0.06, 1.06));
-      const warm = 1 - Math.sin(Math.PI * this._clamp(frac, 0, 1));
-      const glowC = this._mixC('#fff3d8', '#ffb765', warm);
-      ctx.globalCompositeOperation = 'lighter';
-      const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * (0.14 + 0.38 * warm));
-      glow.addColorStop(0, glowC.replace('rgb', 'rgba').replace(')', `,${0.18 + 0.5 * warm})`));
-      glow.addColorStop(0.4, glowC.replace('rgb', 'rgba').replace(')', `,${0.06 + 0.12 * warm})`));
-      glow.addColorStop(1, 'rgba(255,200,120,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = this._mixC('#fffbef', '#ffd27a', warm);
-      ctx.beginPath(); ctx.arc(sx, sy, H * (0.016 + 0.010 * warm), 0, 7); ctx.fill();
-      sunInfo = { sx, sy, warm };
+    // Birds: one flock every ~30s, from before Asr until Maghrib, each flock in
+    // a fresh random direction.
+    const birdOn = nowMin >= (T.asr - 45) && nowMin <= MG;
+    if (this.nextBird == null) this.nextBird = Math.random() * 6;
+    if (birdOn) {
+      this.nextBird -= dt;
+      if (!this.bird && this.nextBird <= 0) {
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        this.bird = { dir, y: H * (0.13 + Math.random() * 0.22), x: dir > 0 ? -0.1 : 1.1, speed: 0.05 + Math.random() * 0.04, phase: Math.random() * 6 };
+        this.nextBird = 30;
+      }
+      if (this.bird) {
+        const b = this.bird; b.x += b.dir * b.speed * dt;
+        if (b.x < -0.2 || b.x > 1.2) this.bird = null;
+        else {
+          ctx.globalAlpha = 0.8; ctx.strokeStyle = 'rgba(20,20,28,0.85)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+          for (let i = 0; i < 5; i++) {
+            const bx = (b.x - i * 0.022 * b.dir) * W;
+            const by = b.y + Math.abs(i - 2) * 10 + Math.sin(t * 4 + i + b.phase) * 3, w = 6 + (i % 3) * 2;
+            ctx.beginPath(); ctx.moveTo(bx - w, by); ctx.quadraticCurveTo(bx, by - w * 0.6, bx + 1, by); ctx.quadraticCurveTo(bx + 2, by - w * 0.6, bx + w + 2, by); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+      }
     }
 
-    /* moon — crescent on its own sprite so the cut never erases the sky */
-    const nightLen = (T.fajr + 1440 - T.isha) % 1440;
-    let nf = null;
-    if (minute >= T.isha + 20) nf = (minute - T.isha - 20) / (nightLen + 40);
-    else if (minute <= T.fajr + 20) nf = (minute + 1440 - T.isha - 20) / (nightLen + 40);
-    if (nf != null && starA > 0.05) {
-      const [mx, my] = arc(this._clamp(nf, 0, 1));
-      ctx.globalCompositeOperation = 'lighter';
-      const mg = ctx.createRadialGradient(mx, my, 0, mx, my, H * 0.16);
-      mg.addColorStop(0, 'rgba(205,216,255,0.35)'); mg.addColorStop(1, 'rgba(205,216,255,0)');
-      ctx.fillStyle = mg;
-      ctx.fillRect(0, 0, W, H);
-      ctx.globalCompositeOperation = 'source-over';
-      const mr = H * 0.015;
-      const spr = document.createElement('canvas');
-      spr.width = spr.height = Math.ceil(mr * 2.4);
-      const sc = spr.getContext('2d'), c = spr.width / 2;
-      sc.fillStyle = '#f2f3ea';
-      sc.beginPath(); sc.arc(c, c, mr, 0, 7); sc.fill();
-      sc.globalCompositeOperation = 'destination-out';
-      sc.beginPath(); sc.arc(c + mr * 0.45, c - mr * 0.28, mr * 0.86, 0, 7); sc.fill();
-      ctx.drawImage(spr, mx - c, my - c);
-      moonInfo = { mx, my };
+    // Gentle shimmer on the water (lower ~third), brighter with day/moon.
+    const waterTop = H * 0.6, shimmer = 0.06 + 0.06 * Math.max(day, night * 0.7);
+    ctx.globalCompositeOperation = 'overlay';
+    for (let i = 0; i < 5; i++) {
+      const yy = waterTop + (i + 0.5) / 5 * (H - waterTop);
+      const a = shimmer * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3)) * (1 - i / 6);
+      ctx.globalAlpha = this._clamp(a, 0, 0.18);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, yy, W, 1.5);
     }
-
-    /* the real terrain — drawn last so it occludes sun, moon and stars */
-    if (ready) this._drawTerrain(pal, box, sunInfo, moonInfo);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   },
 
-  _terrainBox() {
-    const iw = this.terrainImg.naturalWidth, ih = this.terrainImg.naturalHeight;
-    const s = Math.max(this.W / iw, this.H / ih);
-    return { dx: (this.W - iw * s) / 2, dy: this.H - ih * s, dw: iw * s, dh: ih * s };
-  },
-
-  _ridgeYat(fx, box) {
-    if (!this.ridge) return this.H * 0.6;
-    const imgFx = this._clamp((fx * this.W - box.dx) / box.dw, 0, 1);
-    return box.dy + this.ridge[this._clamp(Math.round(imgFx * 127), 0, 127)] * box.dh;
-  },
-
-  _drawTerrain(pal, box, sunInfo, moonInfo) {
-    const { octx, W, H } = this;
-    const dayness = this._clamp((pal.amb - 0.16) / 0.84, 0, 1);
-    octx.clearRect(0, 0, W, H);
-    octx.filter = `brightness(${(0.36 + 0.72 * dayness).toFixed(3)}) saturate(${(0.55 + 0.55 * dayness).toFixed(3)})`;
-    octx.drawImage(this.terrainImg, box.dx, box.dy, box.dw, box.dh);
-    octx.filter = 'none';
-    octx.globalCompositeOperation = 'source-atop';
-    octx.fillStyle = `rgba(16,26,58,${(0.45 * (1 - dayness)).toFixed(3)})`;
-    octx.fillRect(0, 0, W, H);
-    if (sunInfo && sunInfo.warm > 0.15) {
-      const wa = sunInfo.warm;
-      octx.fillStyle = `rgba(255,150,70,${(0.14 * wa).toFixed(3)})`;
-      octx.fillRect(0, 0, W, H);
-      const ry = this._ridgeYat(sunInfo.sx / W, box);
-      const wg = octx.createRadialGradient(sunInfo.sx, ry, 0, sunInfo.sx, ry, H * 0.5);
-      wg.addColorStop(0, `rgba(255,180,90,${(0.34 * wa).toFixed(3)})`);
-      wg.addColorStop(1, 'rgba(255,180,90,0)');
-      octx.fillStyle = wg;
-      octx.fillRect(0, ry - H * 0.02, W, H);
+  /* ---------- readout: local time + phase name ---------- */
+  _readout(nowMin, ci, phaseOverride) {
+    const phase = phaseOverride || this._phaseName(ci);
+    const el = document.getElementById('phaseText');
+    if (el) el.textContent = phase;
+    const out = document.getElementById('sceneReadout');
+    if (out) {
+      const h = Math.floor(nowMin / 60) % 24, m = Math.floor(nowMin % 60);
+      const hr = ((h % 12) || 12), ap = h < 12 ? 'AM' : 'PM';
+      out.textContent = `${hr}:${String(m).padStart(2, '0')} ${ap} · ${phase}`;
     }
-    if (moonInfo) {
-      const ry = this._ridgeYat(moonInfo.mx / W, box);
-      const mgw = octx.createRadialGradient(moonInfo.mx, ry, 0, moonInfo.mx, ry, H * 0.4);
-      mgw.addColorStop(0, 'rgba(200,215,255,0.20)');
-      mgw.addColorStop(1, 'rgba(200,215,255,0)');
-      octx.fillStyle = mgw;
-      octx.fillRect(0, ry - H * 0.02, W, H);
-    }
-    octx.globalCompositeOperation = 'source-over';
-    this.ctx.drawImage(this.off, 0, 0, W, H);
   }
 };
+
+if (typeof window !== 'undefined') window.Scene = Scene;

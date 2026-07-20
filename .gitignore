@@ -23,3 +23,7 @@ athan_app.log
 
 # Personal photo — not for publishing
 *.HEIC
+
+# Design deliverable archives
+*.zip
+Dynamic day-night website theme/
