@@ -32,7 +32,7 @@ const LocationService = {
   async _reverseGeocode(lat, lon) {
     try {
       const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const res = await fetchWithTimeout(url, 6000);
       if (!res.ok) return {};
       const data = await res.json();
       return {
@@ -52,7 +52,7 @@ const LocationService = {
     ];
     for (const provider of providers) {
       try {
-        const res = await fetch(provider.url, { signal: AbortSignal.timeout(6000) });
+        const res = await fetchWithTimeout(provider.url, 6000);
         if (!res.ok) continue;
         const normalized = provider.parse(await res.json());
         if (normalized) return { ...normalized, location_provider: provider.name };

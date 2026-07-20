@@ -85,6 +85,23 @@ const Podcast = {
     });
     document.getElementById('ytThumb').addEventListener('click', () =>
       document.getElementById('ytThumb').classList.toggle('expanded'));
+
+    // Separate Quran volume (independent of the athan volume), persisted
+    // per-visitor and applied straight to the YouTube player.
+    const vol = document.getElementById('quranVolume');
+    vol.value = Config.get('audio_settings.quran_volume', 0.8);
+    vol.addEventListener('input', () => {
+      Config.set('audio_settings.quran_volume', Number(vol.value));
+      this._applyVolume();
+    });
+  },
+
+  _applyVolume() {
+    if (this.ready && this.player?.setVolume) {
+      try {
+        this.player.setVolume(Math.round(Config.get('audio_settings.quran_volume', 0.8) * 100));
+      } catch { /* player may be gone */ }
+    }
   },
 
   play(i) {
@@ -115,6 +132,7 @@ const Podcast = {
         events: {
           onReady: () => {
             this.ready = true;
+            this._applyVolume();
             if (this._pendingIdx != null) {
               this.player.loadVideoById(PODCAST.videoIds[this._pendingIdx]);
               this._pendingIdx = null;
@@ -122,6 +140,7 @@ const Podcast = {
           },
           onStateChange: (e) => {
             this.playing = e.data === YT.PlayerState.PLAYING;
+            if (this.playing) this._applyVolume();
             document.getElementById('playBtn').textContent = this.playing ? '⏸' : '▶';
             if (e.data === YT.PlayerState.ENDED && this.idx < PODCAST.videoIds.length - 1) {
               this.play(this.idx + 1);

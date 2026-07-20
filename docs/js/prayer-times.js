@@ -28,7 +28,7 @@ const PrayerTimesAPI = {
     const params = new URLSearchParams({ latitude, longitude, method, timezone });
     const url = `${this.baseUrl}/timings/${dateStr}?${params}`;
 
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const res = await fetchWithTimeout(url, 10000);
     if (!res.ok) throw new Error(`Aladhan API HTTP ${res.status}`);
     const payload = await res.json();
     if (payload.code !== 200 || !payload.data) throw new Error('Aladhan API returned an error');

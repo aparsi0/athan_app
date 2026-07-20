@@ -21,6 +21,7 @@ const DEFAULT_CONFIG = {
   },
   audio_settings: {
     athan_volume: 0.8,
+    quran_volume: 0.8,
     audio_file: 'assets/audio/Azansoundtrack.m4a',
     athan_files: {
       fajr: 'assets/audio/fajr_athan.m4a',
@@ -88,16 +89,28 @@ function deepMerge(defaults, loaded) {
   return merged;
 }
 
+/* JSON round-trip instead of structuredClone: Safari < 15.4 lacks it */
+function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+/* fetch with a timeout that works in Safari < 16 (no AbortSignal.timeout) */
+function fetchWithTimeout(url, ms) {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), ms) : null;
+  return fetch(url, ctrl ? { signal: ctrl.signal } : {}).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 const Config = {
   data: null,
 
   load() {
     try {
       const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
-      this.data = raw ? deepMerge(DEFAULT_CONFIG, JSON.parse(raw)) : structuredClone(DEFAULT_CONFIG);
+      this.data = raw ? deepMerge(DEFAULT_CONFIG, JSON.parse(raw)) : deepClone(DEFAULT_CONFIG);
     } catch (e) {
       console.warn('Config load failed, using defaults', e);
-      this.data = structuredClone(DEFAULT_CONFIG);
+      this.data = deepClone(DEFAULT_CONFIG);
     }
     return this.data;
   },
@@ -126,12 +139,12 @@ const Config = {
       if (typeof target[key] !== 'object' || target[key] === null) target[key] = {};
       target = target[key];
     }
-    target[keys.at(-1)] = value;
+    target[keys[keys.length - 1]] = value;
     this.save();
   },
 
   reset() {
-    this.data = structuredClone(DEFAULT_CONFIG);
+    this.data = deepClone(DEFAULT_CONFIG);
     this.save();
   }
 };
