@@ -6,12 +6,7 @@ const App = {
 
   async init() {
     Config.load();
-    // migrate old theme values (lake/ridges/mosque/classic) to the photo set
-    if (!['a', 'b', 'c', 'd', 'e'].includes(Config.get('ui_settings.theme', 'd'))) {
-      Config.set('ui_settings.theme', 'd');
-    }
     Scene.init();
-    Scene.setTheme(Config.get('ui_settings.theme', 'd'));
     this.bindUI();
     this.logStatus('Starting Athan Web…');
 
@@ -300,7 +295,6 @@ const App = {
     document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
     document.getElementById('resetSettings').addEventListener('click', () => {
       Config.reset();
-      Scene.setTheme(Config.get('ui_settings.theme', 'd'));
       this.openSettings();
       this.logStatus('Settings reset to defaults.');
     });
@@ -336,10 +330,6 @@ const App = {
   },
 
   openSettings() {
-    // Theme
-    const theme = Config.get('ui_settings.theme', 'd');
-    document.querySelectorAll('input[name="theme"]').forEach((r) => { r.checked = r.value === theme; });
-
     // Prayers
     for (const p of PRAYER_NAMES) {
       document.getElementById(`en_${p}`).checked = Config.get(`prayer_settings.enabled_prayers.${p}`, true) !== false;
@@ -369,11 +359,6 @@ const App = {
   },
 
   async saveSettings() {
-    const themeSel = document.querySelector('input[name="theme"]:checked');
-    if (themeSel) {
-      Config.set('ui_settings.theme', themeSel.value);
-      Scene.setTheme(themeSel.value);
-    }
     for (const p of PRAYER_NAMES) {
       Config.set(`prayer_settings.enabled_prayers.${p}`, document.getElementById(`en_${p}`).checked);
     }

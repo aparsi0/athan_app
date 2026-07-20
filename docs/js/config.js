@@ -67,8 +67,7 @@ const DEFAULT_CONFIG = {
     }
   },
   ui_settings: {
-    show_notifications: true,
-    theme: 'd'
+    show_notifications: true
   }
 };
 

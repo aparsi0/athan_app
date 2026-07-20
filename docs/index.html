@@ -13,11 +13,7 @@
 </head>
 <body>
 
-  <div id="scene">
-    <div id="photo"></div>
-    <div id="shade"></div>
-    <div id="glow"></div>
-  </div>
+  <canvas id="scene"></canvas>
 
   <!-- One-time sound & location gate (browser autoplay policy) -->
   <div id="soundGate" class="sound-gate">
@@ -170,15 +166,6 @@
       <div class="card">
         <h3>Settings</h3>
         <div class="settings-body">
-          <h4>Theme — living landscapes</h4>
-          <div class="theme-grid">
-            <label class="theme-opt"><input type="radio" name="theme" value="a" /> 🏔 A · Alpine Valley<span>Snowy peaks, pine forest &amp; clouds</span></label>
-            <label class="theme-opt"><input type="radio" name="theme" value="b" /> ☁️ B · Above the Clouds<span>Summits over a sea of clouds</span></label>
-            <label class="theme-opt"><input type="radio" name="theme" value="c" /> 🛶 C · Mountain Lake<span>Boat bow on turquoise water</span></label>
-            <label class="theme-opt"><input type="radio" name="theme" value="d" /> 🌅 D · Lake Dock<span>Calm lake &amp; pine shoreline (default)</span></label>
-            <label class="theme-opt"><input type="radio" name="theme" value="e" /> 🌄 E · Golden Valley<span>Sunlit green highlands</span></label>
-          </div>
-
           <h4>Prayers</h4>
           <label><input type="checkbox" id="en_fajr" /> Fajr</label>
           <label><input type="checkbox" id="en_dhuhr" /> Dhuhr</label>
