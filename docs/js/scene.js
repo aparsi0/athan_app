@@ -32,8 +32,16 @@
  *   requestAnimationFrame; rendering pauses while the tab is hidden.
  */
 const Scene = {
-  IMG_COUNT: 19,
+  IMG_COUNT: 20,
   IMG_PATH: i => `assets/sky_${String(i).padStart(2, '0')}.jpg`,
+
+  // Cross-fade behavior: each painting HOLDS solid for most of its segment,
+  // then fades to the next over a short window at the segment boundary
+  // (max 6 minutes, at most 35% of the segment). Without this, the two
+  // paintings blend 50/50 for most of an hour and their differently-placed
+  // suns/moons appear together as a "two suns" ghost.
+  FADE_MAX_MIN: 6,
+  FADE_MAX_FRAC: 0.35,
 
   // Fallback prayer times (minutes since midnight) until the app calls setTimes.
   times: { fajr: 300, sunrise: 372, dhuhr: 786, asr: 1005, maghrib: 1200, isha: 1290 },
@@ -109,11 +117,12 @@ const Scene = {
       17: (MG + I) / 2,
       18: I,
       19: I + 60,
+      20: ((I + 60) + (I + nextF) / 2) / 2,   // moon mid-sky bridge (user's frame 20)
       1: (I + nextF) / 2,
       2: lerp(I, nextF, 0.75)
     };
     // Ordered sequence (image index + time), Fajr → … → Fajr+1440 (wrap = img 3).
-    const order = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 1, 2];
+    const order = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2];
     this.anchors = order.map(i => ({ i, t: at[i] }));
     this.anchors.push({ i: 3, t: nextF }); // wrap sentinel
     this._fajr = F;
@@ -131,7 +140,14 @@ const Scene = {
       if (t >= A[k].t && t <= A[k + 1].t) {
         const span = A[k + 1].t - A[k].t || 1;
         const raw = (t - A[k].t) / span;
-        const frac = raw * raw * (3 - 2 * raw); // smoothstep
+        // Hold solid, then fade only inside the short boundary window.
+        const fadeLen = Math.min(this.FADE_MAX_MIN, span * this.FADE_MAX_FRAC);
+        const fadeStart = A[k + 1].t - fadeLen;
+        let frac = 0;
+        if (t >= fadeStart) {
+          const f = (t - fadeStart) / (fadeLen || 1);
+          frac = f * f * (3 - 2 * f); // smoothstep inside the fade window
+        }
         return { a: A[k].i, b: A[k + 1].i, frac, ci: k + raw };
       }
     }
@@ -168,7 +184,7 @@ const Scene = {
       1: 'Night', 2: 'Late night', 3: 'Fajr — first light', 4: 'Dawn', 5: 'Sunrise',
       6: 'Morning', 7: 'Morning', 8: 'Late morning', 9: 'Late morning', 10: 'Midday',
       11: 'Early afternoon', 12: 'Afternoon', 13: 'Late afternoon', 14: 'Golden hour',
-      15: 'Golden hour', 16: 'Sunset', 17: 'Dusk', 18: 'Nightfall', 19: 'Night'
+      15: 'Golden hour', 16: 'Sunset', 17: 'Dusk', 18: 'Nightfall', 19: 'Night', 20: 'Night'
     };
     // nearest anchor in the ordered sequence
     const A = this.anchors, k = Math.round(this._clamp(ci, 0, A.length - 1));
@@ -179,12 +195,21 @@ const Scene = {
   _loop() {
     cancelAnimationFrame(this.raf);
     const step = () => {
-      if (this.paused) return;
-      this._elapsed = performance.now() - this.t0;
-      this.render();
+      // Never break the rAF chain — a break while hidden left the scene
+      // frozen forever. When the tab is hidden the browser stops servicing
+      // rAF anyway, so keeping the chain alive costs nothing.
+      if (!this.paused) {
+        this._elapsed = performance.now() - this.t0;
+        this.render();
+      }
       this.raf = requestAnimationFrame(step);
     };
     step();
+    // Safety net: also render on a slow interval (covers rAF quirks and
+    // big clock jumps while the tab was asleep).
+    if (!this._safety) {
+      this._safety = setInterval(() => { if (!document.hidden) this.render(); }, 30000);
+    }
   },
 
   _nowMinutes() {
@@ -199,19 +224,6 @@ const Scene = {
     const { ctx, W, H } = this;
     const time = (performance.now() - this.t0) / 1000;
     const nowMin = this._nowMinutes();
-
-    // Deep-night HOLD (23:00–01:00): show one fixed painting only, so the
-    // cross-fade between two moon paintings can't put two moons in the sky.
-    const clock = ((nowMin % 1440) + 1440) % 1440;
-    if (clock >= 1380 || clock < 60) {
-      const hold = this._holdImg();
-      ctx.clearRect(0, 0, W, H);
-      if (hold.ready) { ctx.globalAlpha = 1; this._cover(hold.im); }
-      else { ctx.fillStyle = '#0a1326'; ctx.fillRect(0, 0, W, H); }
-      this._overlays(ctx, time, nowMin, 0.5); // stars/shimmer only at this hour
-      this._readout(nowMin, 0.5, 'Night');
-      return;
-    }
 
     const pos = this._position(nowMin);
 
@@ -237,17 +249,6 @@ const Scene = {
     const s = Math.max(W / iw, H / ih);
     const w = iw * s, h = ih * s;
     ctx.drawImage(img, (W - w) / 2, (H - h) * 0.5, w, h);
-  },
-
-  _holdImg() {
-    if (!this._hold) {
-      const im = new Image();
-      this._hold = { im, ready: false };
-      im.onload = () => { this._hold.ready = true; };
-      im.decoding = 'async';
-      im.src = 'assets/sky_night_hold.jpg';
-    }
-    return this._hold;
   },
 
   /* ---------- overlays (all subtle) ---------- */
