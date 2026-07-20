@@ -192,6 +192,22 @@ After trying five photo themes and a lighting-only mode, the user settled on:
   ONE reusable user-activated <audio> element (Safari only allows play() on elements the
   user directly activated). sw v11.
 
+## 7d. Animated painted theme (2026-07-20 — CURRENT)
+
+User produced 19 hand-painted frames of one valley (via Claude design) covering the whole
+day; integrated as the site's only theme, replacing the Lake Dock photo scene:
+- `docs/assets/sky_01..19.jpg` + `sky_night_hold.jpg` (recompressed from the 95 MB PNG
+  delivery to 3.6 MB total; source zip + extracted folder are gitignored in the repo root).
+- `docs/js/scene.js` (from the design delivery, lightly patched): continuous cross-fade
+  between the two frames bracketing "now", anchored to the visitor's REAL solar moments
+  via Scene.setTimes (Fajr/sunrise/noon/sunset/Isha) — never fixed clock hours. Runtime
+  overlays: drifting clouds (day), twinkling stars + shooting star (~30 s, night), bird
+  flocks (Asr−45 min→Maghrib), water shimmer. Deep-night HOLD frame 23:00–01:00 prevents
+  two moon paintings cross-fading into a two-moon sky (patched its phase label).
+  Only current+next frames are loaded; rAF pauses when tab hidden.
+  Debug: set `Scene._debugMinutes = <minutes>` in the console to preview any time.
+- Readout chip `#sceneReadout` bottom-left: "8:45 AM · Morning". sw v12.
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind — see §6).
