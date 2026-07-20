@@ -177,6 +177,21 @@ Prototyped in `demo/` (kept for reference; not deployed), then shipped to `docs/
   explanation (ultrasonics don't repel roaches; speakers can't emit >20 kHz; audible-to-kids
   risk). Keep-alive track confirmed harmless to speakers.
 
+## 7c. Final scene state (2026-07-19 evening — CURRENT)
+
+After trying five photo themes and a lighting-only mode, the user settled on:
+- **One theme only: Lake Dock**, rendered with the full living-sky canvas engine
+  (`terrain_d.png` sky-cut photo + `ridge_d.json` treeline): sun & moon rise/set behind
+  the treeline, stars occluded, light reflections on the water. Theme picker REMOVED
+  (`ui_settings.theme` ignored). Other theme photos deleted; pipeline still in scratchpad.
+- **Separate Quran volume**: slider in the Quran player bar (`audio_settings.quran_volume`,
+  default 0.8) applied via YouTube setVolume — independent of athan volume.
+- **Safari compatibility** (user reported "not working in Safari"): removed
+  structuredClone / AbortSignal.timeout / Array.at(-1) (fetchWithTimeout + deepClone
+  helpers in config.js), -webkit-backdrop-filter prefixes, and AudioManager refactored to
+  ONE reusable user-activated <audio> element (Safari only allows play() on elements the
+  user directly activated). sw v11.
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind — see §6).
