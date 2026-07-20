@@ -125,6 +125,7 @@ const App = {
         this.logStatus(`▶ After-prayer Duaa (${PRAYER_LABELS[event.prayer].en})`);
         await AudioManager.play(duaa.audio_file, duaa.volume, 'After-prayer Duaa');
       }
+      Podcast.maybeResume(); // Quran continues where it was interrupted
       this.renderSchedule();
       return;
     }
@@ -134,6 +135,7 @@ const App = {
     if (cfg.audio_file) {
       await AudioManager.play(cfg.audio_file, cfg.volume, event.label);
     }
+    Podcast.maybeResume(); // Quran continues where it was interrupted
     this.renderSchedule();
   },
 
@@ -280,6 +282,7 @@ const App = {
 
     document.getElementById('stopBtn').addEventListener('click', () => {
       AudioManager.stop();
+      Podcast.cancelResume(); // user asked for silence — don't auto-resume the Quran
       this.logStatus('Playback stopped.');
     });
 
@@ -321,7 +324,8 @@ const App = {
     await AudioManager.unlock();
     AudioManager.startKeepAlive();
     Podcast.pause();
-    AudioManager.play(file, Config.get('audio_settings.athan_volume', 0.8), label);
+    AudioManager.play(file, Config.get('audio_settings.athan_volume', 0.8), label)
+      .then(() => Podcast.maybeResume());
   },
 
   updateTestButton() {

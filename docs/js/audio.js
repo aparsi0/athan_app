@@ -29,16 +29,19 @@ const AudioManager = {
     const el = this._ensureEl();
     if (this._active) return true;   // something is already playing on it
     try {
-      el.muted = true;
+      // volume-0 (NOT muted): Chromium force-pauses muted media in background
+      // tabs ("video-only background media"), which made a muted probe fail.
+      el.muted = false;
+      el.volume = 0;
       el.src = Config.get('audio_settings.audio_file');
       await el.play();
       el.pause();
       el.currentTime = 0;
-      el.muted = false;
+      el.volume = 1;
       this.unlocked = true;
       return true;
     } catch (e) {
-      el.muted = false;
+      el.volume = 1;
       console.warn('Audio unlock failed', e);
       return false;
     }

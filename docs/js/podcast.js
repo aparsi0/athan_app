@@ -110,6 +110,7 @@ const Podcast = {
       App.logStatus('⚠️ Prayer audio is playing — the Quran will not interrupt it.');
       return;
     }
+    this._resumeWanted = false; // manual start supersedes any pending auto-resume
     this.idx = i;
     document.getElementById('ytThumb').style.display = 'block';
     document.getElementById('piTitle').textContent = `سورة ${PODCAST.surahs[i]}`;
@@ -142,13 +143,16 @@ const Podcast = {
             this.playing = e.data === YT.PlayerState.PLAYING;
             if (this.playing) this._applyVolume();
             document.getElementById('playBtn').textContent = this.playing ? '⏸' : '▶';
-            if (e.data === YT.PlayerState.ENDED && this.idx < PODCAST.videoIds.length - 1) {
-              this.play(this.idx + 1);
+            if (e.data === YT.PlayerState.ENDED) {
+              // Loop the playlist: after سورة الناس (114), start again at الفاتحة.
+              const next = (this.idx + 1) % PODCAST.videoIds.length;
+              if (next === 0) App.logStatus('🎙 Playlist completed — starting again from سورة الفاتحة.');
+              this.play(next);
             }
           },
           onError: () => {
             App.logStatus(`⚠️ سورة ${PODCAST.surahs[this.idx]} could not play — skipping to the next one.`);
-            if (this.idx < PODCAST.videoIds.length - 1) this.play(this.idx + 1);
+            this.play((this.idx + 1) % PODCAST.videoIds.length);
           }
         }
       });
@@ -162,10 +166,29 @@ const Podcast = {
     }
   },
 
-  /** Pause Quran playback (called when prayer audio starts). */
+  /** Pause Quran playback (called when prayer audio starts). Remembers that
+   *  it was playing so it can resume once the prayer audio finishes. */
   pause() {
     if (this.ready && this.player?.pauseVideo) {
+      if (this.playing) this._resumeWanted = true;
       try { this.player.pauseVideo(); } catch { /* player may be gone */ }
     }
+  },
+
+  /** Resume Quran playback if it was interrupted by prayer audio and the
+   *  prayer audio has fully finished. */
+  maybeResume() {
+    if (this._resumeWanted && this.ready && this.player?.playVideo && !AudioManager.isPlaying()) {
+      this._resumeWanted = false;
+      try {
+        this.player.playVideo();
+        App.logStatus('🎙 Prayer audio finished — resuming the Quran.');
+      } catch { /* player may be gone */ }
+    }
+  },
+
+  /** Forget any pending auto-resume (user pressed Stop — they want silence). */
+  cancelResume() {
+    this._resumeWanted = false;
   }
 };
