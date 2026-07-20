@@ -208,6 +208,15 @@ day; integrated as the site's only theme, replacing the Lake Dock photo scene:
   Debug: set `Scene._debugMinutes = <minutes>` in the console to preview any time.
 - Readout chip `#sceneReadout` bottom-left: "8:45 AM · Morning". sw v12.
 
+## 7e. Quran resume + playlist loop (2026-07-20)
+
+- Prayer audio (athan/woduaa/azkar/duaa) pauses the Quran and now AUTO-RESUMES it once the
+  chain fully finishes (`Podcast.pause()` remembers, `Podcast.maybeResume()` fires after the
+  awaits in `App.handleEvent` and after Test Athan). Stop button calls `Podcast.cancelResume()`
+  — manual stop never auto-resumes. The 114-surah playlist loops (An-Nas → Al-Fatiha).
+- Audio unlock probe is volume-0 (NOT muted): Chromium force-pauses muted media in
+  background tabs, which failed the unlock. sw v14.
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind — see §6).
