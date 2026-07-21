@@ -241,6 +241,41 @@ main {
 .player-info .pi-sub { font-size: 11.5px; color: var(--muted); text-align: right; }
 .qvol { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
 .qvol input[type="range"] { width: 90px; accent-color: var(--gold); }
+
+.player-progress { display: flex; align-items: center; gap: 10px; margin: 2px 0 14px; }
+.player-progress .ptime {
+  font-size: 11px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+}
+.player-progress .ptime:last-child { text-align: right; }
+input[type="range"].seek {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.15);
+  cursor: pointer;
+  outline: none;
+}
+input[type="range"].seek::-webkit-slider-runnable-track { height: 5px; border-radius: 3px; background: transparent; }
+input[type="range"].seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--gold);
+  margin-top: -4px;
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.18);
+  cursor: pointer;
+}
+input[type="range"].seek::-moz-range-track { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.15); }
+input[type="range"].seek::-moz-range-progress { height: 5px; border-radius: 3px; background: var(--gold); }
+input[type="range"].seek::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%; border: none;
+  background: var(--gold);
+  cursor: pointer;
+}
+input[type="range"].seek:disabled { opacity: 0.4; cursor: default; }
 #ytThumb {
   position: fixed; right: 12px; bottom: 76px; z-index: 55;
   width: 178px; border-radius: 10px; overflow: hidden;

@@ -94,6 +94,72 @@ const Podcast = {
       Config.set('audio_settings.quran_volume', Number(vol.value));
       this._applyVolume();
     });
+
+    this._bindSeek();
+  },
+
+  /** Seek bar: shows this surah's duration, fills as it plays, and can be
+   *  dragged forward or back — each surah has its own length, read live
+   *  from the player, so the bar always matches the surah currently playing. */
+  _bindSeek() {
+    const seek = document.getElementById('quranSeek');
+    const cur = document.getElementById('piCurrent');
+    const dur = document.getElementById('piDuration');
+    this._seekEl = seek; this._curEl = cur; this._durEl = dur;
+
+    const startSeeking = () => { this._seeking = true; };
+    seek.addEventListener('pointerdown', startSeeking);
+    seek.addEventListener('touchstart', startSeeking, { passive: true });
+
+    // Live feedback while dragging (label + fill), without spamming YouTube.
+    seek.addEventListener('input', () => {
+      this._paintSeek(Number(seek.value), Number(seek.max));
+    });
+
+    const commit = () => {
+      if (!this._seeking) return;
+      this._seeking = false;
+      if (this.ready && this.player?.seekTo) {
+        try { this.player.seekTo(Number(seek.value), true); } catch { /* player may be gone */ }
+      }
+    };
+    seek.addEventListener('change', commit);
+    seek.addEventListener('pointerup', commit);
+    seek.addEventListener('touchend', commit);
+
+    setInterval(() => this._pollProgress(), 500);
+  },
+
+  _pollProgress() {
+    if (this._seeking || !this.ready || this.idx == null || !this.player?.getCurrentTime) return;
+    let current, duration;
+    try {
+      current = this.player.getCurrentTime();
+      duration = this.player.getDuration();
+    } catch { return; }
+    if (!Number.isFinite(current) || !Number.isFinite(duration)) return;
+    const seek = this._seekEl;
+    if (duration > 0) {
+      seek.disabled = false;
+      const maxWhole = Math.floor(duration);
+      if (Number(seek.max) !== maxWhole) seek.max = maxWhole;
+    }
+    seek.value = Math.floor(current);
+    this._paintSeek(current, duration);
+  },
+
+  _paintSeek(current, duration) {
+    const seek = this._seekEl;
+    const pct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
+    seek.style.background = `linear-gradient(to right, var(--gold) ${pct}%, rgba(255,255,255,0.15) ${pct}%)`;
+    this._curEl.textContent = this._fmtTime(current);
+    if (duration > 0) this._durEl.textContent = this._fmtTime(duration);
+  },
+
+  _fmtTime(s) {
+    if (!Number.isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
   },
 
   _applyVolume() {
@@ -117,6 +183,15 @@ const Podcast = {
     document.getElementById('piSub').textContent = `${i + 1} / 114 · Sheikh Mahmoud Ali Al-Banna`;
     document.querySelectorAll('.surah-list li').forEach(el =>
       el.classList.toggle('playing', Number(el.dataset.i) === i));
+    // Reset the seek bar for the new surah — its duration is read fresh
+    // from the player once the new video loads, via _pollProgress().
+    if (this._seekEl) {
+      this._seeking = false;
+      this._seekEl.value = 0;
+      this._seekEl.max = 0;
+      this._seekEl.disabled = true;
+      this._paintSeek(0, 0);
+    }
     if (this.ready) this.player.loadVideoById(PODCAST.videoIds[i]);
     else { this._pendingIdx = i; this._ensure(); }
     App.logStatus(`🎙 Playing سورة ${PODCAST.surahs[i]} (${i + 1}/114)`);
