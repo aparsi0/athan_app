@@ -93,50 +93,67 @@ const Scene = {
   // Build anchor times on a monotonic timeline that starts at Fajr and runs
   // one full solar day to Fajr+1440.
   //
-  // IMPORTANT: these anchors are matched to the actual painted content, not
-  // to the index labels alone. Inspecting the 20 frames shows the sun disc
-  // is visible ONLY in frames 6-16; frames 1-5 and 17-20 have no sun at all
-  // (frame 5 is still a dark pre-sunrise sky, not "sunrise" itself — the sun
-  // first appears in frame 6; frame 16 still shows the full sun low on the
-  // horizon, only frame 17 shows it gone). So:
-  //   - Sunrise (sun first appears) is anchored to frame 6, not 5.
-  //   - Maghrib (sun must be gone) is anchored to frame 17, not 16.
-  // Combined with the hold-then-fade timing below, this guarantees the sun
-  // is never visible before Sunrise or still visible after Maghrib.
+  // These anchors follow an exact spec (each arrival tied to a prayer/solar
+  // moment, matched against what's actually painted in each frame):
+  //   1  — Fajr itself (frame 1 must be on screen when the Fajr athan plays),
+  //        holds for 20 minutes.
+  //   2,3,4,5 — divide the remaining time from Fajr+20 up to Sunrise into
+  //        four equal spans, one frame each; frame 5 holds until Sunrise.
+  //   6  — Sunrise (the frame where the sun disc rises); sun visible 6-16.
+  //   7-16 — sunrise → solar noon (Dhuhr) → Maghrib, as before.
+  //   17 — arrives 1 minute BEFORE Maghrib (sun must already be gone by the
+  //        time Maghrib is called).
+  //   18 — dusk; holds until Isha − 20 minutes.
+  //   19 — must already be on screen the moment Isha is called, via a
+  //        20-minute fade starting at Isha − 20 (see _fadeOverride below).
+  //   20 — the user's moon-mid-sky bridge frame, mid-way through the night.
+  // 19 → 20 → 1 span the whole night (early/mid/deep) and 1 arrives exactly
+  // at the next Fajr, closing the loop.
   _buildAnchors() {
     const T = this.times;
     const F = T.fajr, SR = T.sunrise, N = T.dhuhr, MG = T.maghrib, I = T.isha;
     const nextF = F + 1440;
     const nightLen = nextF - I;
     const lerp = (a, b, t) => a + (b - a) * t;
+
+    // Fajr holds 20 minutes, then 2/3/4/5 evenly split what's left until Sunrise.
+    const dawnStart = F + 20;
+    const dawnSpan = SR - dawnStart;
+
     // index -> absolute minute on the [F, F+1440] timeline
     const at = {
-      3: F,                        // Fajr — no sun
-      4: lerp(F, SR, 1 / 3),        // no sun
-      5: lerp(F, SR, 2 / 3),        // no sun (last frame before sunrise)
-      6: SR,                        // Sunrise — sun disc first appears
+      1: F,                              // Fajr — frame 1 must be on screen
+      2: dawnStart,
+      3: dawnStart + dawnSpan * 0.25,
+      4: dawnStart + dawnSpan * 0.50,
+      5: dawnStart + dawnSpan * 0.75,     // holds until Sunrise
+      6: SR,                             // Sunrise — sun disc rises
       7: lerp(SR, N, 0.25),
       8: lerp(SR, N, 0.50),
       9: lerp(SR, N, 0.75),
-      10: N,                        // solar noon (Dhuhr)
+      10: N,                             // solar noon (Dhuhr)
       11: lerp(N, MG, 0.16),
       12: lerp(N, MG, 0.32),
       13: lerp(N, MG, 0.48),
       14: lerp(N, MG, 0.64),
       15: lerp(N, MG, 0.80),
-      16: lerp(N, MG, 0.93),        // sun still visible, low on horizon
-      17: MG,                       // Maghrib — sun disc must be gone
-      18: I,                        // Isha — nightfall
-      19: I + nightLen * 0.22,
-      20: I + nightLen * 0.46,      // moon mid-sky bridge (user's frame 20)
-      1: I + nightLen * 0.70,
-      2: I + nightLen * 0.88
+      16: lerp(N, MG, 0.93),             // sun still visible, low on horizon
+      17: MG - 1,                        // 1 minute before Maghrib — sun gone
+      18: lerp(MG - 1, I - 20, 0.5),      // dusk; holds until Isha-20
+      19: I,                             // Isha — frame 19 must already be on screen
+      20: I + nightLen * 0.5             // moon mid-sky bridge, mid-night
     };
-    // Ordered sequence (image index + time), Fajr → … → Fajr+1440 (wrap = img 3).
-    const order = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2];
+    // Ordered sequence (image index + time), Fajr → … → Fajr+1440 (wrap = img 1).
+    const order = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
     this.anchors = order.map(i => ({ i, t: at[i] }));
-    this.anchors.push({ i: 3, t: nextF }); // wrap sentinel
+    this.anchors.push({ i: 1, t: nextF }); // wrap sentinel
     this._fajr = F;
+
+    // Segments with an explicit fade duration (minutes) instead of the
+    // default short hold-then-fade — keyed by the ARRIVING frame's index.
+    // "18 lasts until 20 minutes before Isha" means the fade into 19 spans
+    // exactly that 20-minute window, ending precisely at Isha.
+    this._fadeOverride = { 19: 20 };
   },
 
   // Returns { a, b, frac, ci } — bracketing image indices, blend fraction, and
@@ -151,8 +168,12 @@ const Scene = {
       if (t >= A[k].t && t <= A[k + 1].t) {
         const span = A[k + 1].t - A[k].t || 1;
         const raw = (t - A[k].t) / span;
-        // Hold solid, then fade only inside the short boundary window.
-        const fadeLen = Math.min(this.FADE_MAX_MIN, span * this.FADE_MAX_FRAC);
+        // Hold solid, then fade only inside the boundary window — a short
+        // default window, or an explicit override for specific arrivals.
+        const override = this._fadeOverride && this._fadeOverride[A[k + 1].i];
+        const fadeLen = override != null
+          ? Math.min(override, span)
+          : Math.min(this.FADE_MAX_MIN, span * this.FADE_MAX_FRAC);
         const fadeStart = A[k + 1].t - fadeLen;
         let frac = 0;
         if (t >= fadeStart) {
@@ -192,7 +213,7 @@ const Scene = {
 
   _phaseName(ci) {
     const names = {
-      1: 'Night', 2: 'Late night', 3: 'Fajr — first light', 4: 'Dawn', 5: 'Dawn',
+      1: 'Fajr — first light', 2: 'Dawn', 3: 'Dawn', 4: 'Dawn', 5: 'Dawn',
       6: 'Sunrise', 7: 'Morning', 8: 'Morning', 9: 'Late morning', 10: 'Midday',
       11: 'Early afternoon', 12: 'Afternoon', 13: 'Afternoon', 14: 'Late afternoon',
       15: 'Golden hour', 16: 'Golden hour', 17: 'Sunset', 18: 'Dusk', 19: 'Nightfall', 20: 'Night'
