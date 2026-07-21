@@ -37,10 +37,12 @@ const Scene = {
 
   // Cross-fade behavior: each painting HOLDS solid for most of its segment,
   // then fades to the next over a short window at the segment boundary
-  // (max 6 minutes, at most 35% of the segment). Without this, the two
-  // paintings blend 50/50 for most of an hour and their differently-placed
-  // suns/moons appear together as a "two suns" ghost.
-  FADE_MAX_MIN: 6,
+  // (max 30 seconds, at most 35% of the segment). Kept deliberately brief:
+  // most night frames each paint the moon at a different sky position, so
+  // any longer blend shows two moons at once (the same issue as "two suns"
+  // during the day) — a 30-second window is quick enough that it isn't
+  // noticeable, while every arrival time below still lands exactly on time.
+  FADE_MAX_MIN: 0.5,
   FADE_MAX_FRAC: 0.35,
 
   // Fallback prayer times (minutes since midnight) until the app calls setTimes.
@@ -103,9 +105,10 @@ const Scene = {
   //   7-16 — sunrise → solar noon (Dhuhr) → Maghrib, as before.
   //   17 — arrives 1 minute BEFORE Maghrib (sun must already be gone by the
   //        time Maghrib is called).
-  //   18 — dusk; holds until Isha − 20 minutes.
-  //   19 — must already be on screen the moment Isha is called, via a
-  //        20-minute fade starting at Isha − 20 (see _fadeOverride below).
+  //   18 — dusk; arrives partway through the evening and holds until Isha.
+  //   19 — must already be on screen the moment Isha is called (the brief
+  //        default fade below lands it exactly on time without a long
+  //        two-moon blend along the way).
   //   20 — the user's moon-mid-sky bridge frame, mid-way through the night.
   // 19 → 20 → 1 span the whole night (early/mid/deep) and 1 arrives exactly
   // at the next Fajr, closing the loop.
@@ -149,11 +152,12 @@ const Scene = {
     this.anchors.push({ i: 1, t: nextF }); // wrap sentinel
     this._fajr = F;
 
-    // Segments with an explicit fade duration (minutes) instead of the
-    // default short hold-then-fade — keyed by the ARRIVING frame's index.
-    // "18 lasts until 20 minutes before Isha" means the fade into 19 spans
-    // exactly that 20-minute window, ending precisely at Isha.
-    this._fadeOverride = { 19: 20 };
+    // Per-segment fade-duration overrides (minutes), keyed by the ARRIVING
+    // frame's index — unused for now. Frame 18 already holds until Isha-20
+    // via its own anchor above; the transition into 19 then uses the same
+    // brief default fade as everywhere else, so it still lands exactly on
+    // frame 19 at Isha without a long two-moon blend along the way.
+    this._fadeOverride = {};
   },
 
   // Returns { a, b, frac, ci } — bracketing image indices, blend fraction, and

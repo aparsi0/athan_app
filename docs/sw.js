@@ -3,7 +3,7 @@
  * and caches audio files the first time they play.
  * Bump CACHE_VERSION when deploying changes to force clients to update.
  */
-const CACHE_VERSION = 'athan-web-v17';
+const CACHE_VERSION = 'athan-web-v18';
 const APP_SHELL = [
   '.',
   'index.html',
