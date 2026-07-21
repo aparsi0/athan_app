@@ -90,36 +90,47 @@ const Scene = {
   },
 
   /* ============================ SOLAR ANCHORS ============================ */
-  // Build 19 anchor times on a monotonic timeline that starts at Fajr and runs
-  // one full solar day to Fajr+1440. Night images (18,19,1,2) live in the
-  // Isha→next-Fajr gap, so the sequence never goes backwards.
+  // Build anchor times on a monotonic timeline that starts at Fajr and runs
+  // one full solar day to Fajr+1440.
+  //
+  // IMPORTANT: these anchors are matched to the actual painted content, not
+  // to the index labels alone. Inspecting the 20 frames shows the sun disc
+  // is visible ONLY in frames 6-16; frames 1-5 and 17-20 have no sun at all
+  // (frame 5 is still a dark pre-sunrise sky, not "sunrise" itself — the sun
+  // first appears in frame 6; frame 16 still shows the full sun low on the
+  // horizon, only frame 17 shows it gone). So:
+  //   - Sunrise (sun first appears) is anchored to frame 6, not 5.
+  //   - Maghrib (sun must be gone) is anchored to frame 17, not 16.
+  // Combined with the hold-then-fade timing below, this guarantees the sun
+  // is never visible before Sunrise or still visible after Maghrib.
   _buildAnchors() {
     const T = this.times;
     const F = T.fajr, SR = T.sunrise, N = T.dhuhr, MG = T.maghrib, I = T.isha;
     const nextF = F + 1440;
+    const nightLen = nextF - I;
     const lerp = (a, b, t) => a + (b - a) * t;
     // index -> absolute minute on the [F, F+1440] timeline
     const at = {
-      3: F,
-      4: (F + SR) / 2,
-      5: SR,
-      6: lerp(SR, N, 0.25),
-      7: lerp(SR, N, 0.50),
-      8: lerp(SR, N, 0.75),
-      9: lerp(SR, N, 0.95),
-      10: N,
-      11: lerp(N, MG, 0.25),
-      12: lerp(N, MG, 0.40),
-      13: lerp(N, MG, 0.60),
-      14: lerp(N, MG, 0.80),
-      15: lerp(N, MG, 0.96),
-      16: MG,
-      17: (MG + I) / 2,
-      18: I,
-      19: I + 60,
-      20: ((I + 60) + (I + nextF) / 2) / 2,   // moon mid-sky bridge (user's frame 20)
-      1: (I + nextF) / 2,
-      2: lerp(I, nextF, 0.75)
+      3: F,                        // Fajr — no sun
+      4: lerp(F, SR, 1 / 3),        // no sun
+      5: lerp(F, SR, 2 / 3),        // no sun (last frame before sunrise)
+      6: SR,                        // Sunrise — sun disc first appears
+      7: lerp(SR, N, 0.25),
+      8: lerp(SR, N, 0.50),
+      9: lerp(SR, N, 0.75),
+      10: N,                        // solar noon (Dhuhr)
+      11: lerp(N, MG, 0.16),
+      12: lerp(N, MG, 0.32),
+      13: lerp(N, MG, 0.48),
+      14: lerp(N, MG, 0.64),
+      15: lerp(N, MG, 0.80),
+      16: lerp(N, MG, 0.93),        // sun still visible, low on horizon
+      17: MG,                       // Maghrib — sun disc must be gone
+      18: I,                        // Isha — nightfall
+      19: I + nightLen * 0.22,
+      20: I + nightLen * 0.46,      // moon mid-sky bridge (user's frame 20)
+      1: I + nightLen * 0.70,
+      2: I + nightLen * 0.88
     };
     // Ordered sequence (image index + time), Fajr → … → Fajr+1440 (wrap = img 3).
     const order = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2];
@@ -181,10 +192,10 @@ const Scene = {
 
   _phaseName(ci) {
     const names = {
-      1: 'Night', 2: 'Late night', 3: 'Fajr — first light', 4: 'Dawn', 5: 'Sunrise',
-      6: 'Morning', 7: 'Morning', 8: 'Late morning', 9: 'Late morning', 10: 'Midday',
-      11: 'Early afternoon', 12: 'Afternoon', 13: 'Late afternoon', 14: 'Golden hour',
-      15: 'Golden hour', 16: 'Sunset', 17: 'Dusk', 18: 'Nightfall', 19: 'Night', 20: 'Night'
+      1: 'Night', 2: 'Late night', 3: 'Fajr — first light', 4: 'Dawn', 5: 'Dawn',
+      6: 'Sunrise', 7: 'Morning', 8: 'Morning', 9: 'Late morning', 10: 'Midday',
+      11: 'Early afternoon', 12: 'Afternoon', 13: 'Afternoon', 14: 'Late afternoon',
+      15: 'Golden hour', 16: 'Golden hour', 17: 'Sunset', 18: 'Dusk', 19: 'Nightfall', 20: 'Night'
     };
     // nearest anchor in the ordered sequence
     const A = this.anchors, k = Math.round(this._clamp(ci, 0, A.length - 1));
