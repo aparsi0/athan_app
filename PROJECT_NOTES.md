@@ -1,226 +1,212 @@
-# Athan App — Project Notes & History
+# Athan App — Project Summary
 
-> Reference document summarizing everything done so far, the current state, and all
-> decisions — so any future chat/session can pick up exactly where we left off.
-> Last updated: **2026-07-15**.
+> Compact reference: current features, full folder map, and a condensed changelog.
+> Read this first in any new session — it replaces re-deriving context from scratch.
+> Last updated: **2026-07-21**.
 
 ---
 
 ## 1. What this project is
 
-Two versions of an Islamic prayer-time application that plays the athan (and related
-audio) automatically at the correct times:
-
 | Version | Where | Status |
 |---|---|---|
-| **Desktop app** (original) | Repo root: `main.py`, `main_headless.py`, `core/`, `gui/`, `config/`, `utils/` — Python + VLC + Aladhan API | Unchanged, still works |
-| **Athan Web** (browser port) | `docs/` folder — vanilla JS PWA, same features | **Live on GitHub Pages** |
+| **Desktop app** (original) | Repo root — Python + VLC + Aladhan API | Unchanged, still works |
+| **Athan Web** (browser port) | `docs/` — vanilla JS PWA | **Live on GitHub Pages** |
 
-## 2. The live website
+**Live link:** https://aparsi0.github.io/athan_app/
+**Repo:** https://github.com/aparsi0/athan_app (public, account `aparsi0`, `gh` CLI authed locally)
 
-- **Public link (share this):** https://aparsi0.github.io/athan_app/
-- **Repository:** https://github.com/aparsi0/athan_app (public, GitHub account `aparsi0`)
-- **Hosting:** GitHub Pages, **branch-based** — serves the `docs/` folder of branch `main`.
-  - There is **no Actions workflow**. (One was written initially, but the `gh` OAuth token
-    lacked `workflow` scope, so we renamed `web/` → `docs/` and used branch-based Pages instead.)
-- **How to update the site:** edit files in `docs/`, then
-  `git add -A && git commit -m "..." && git push` — live at the **same URL** ~1 minute later.
-- **Cache note:** when changing HTML/CSS/JS, bump `CACHE_VERSION` in `docs/sw.js`
-  (currently `athan-web-v4`) so visitors' service workers fetch the new version promptly.
-- **Local preview:** `python3 -m http.server 8734 --directory docs`
-  (also configured in `.claude/launch.json` as server name `athan-web`).
-- `gh` CLI is installed and authenticated on this machine (account `aparsi0`, keyring).
+## 2. How to update the live site
 
-## 3. Web app architecture (`docs/`)
+```bash
+# edit files under docs/, then:
+git add -A && git commit -m "..." && git push
+```
+Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
+no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
+`CACHE_VERSION` in `docs/sw.js` (currently **v18**) so visitors' service workers refresh promptly.
+Tabs already open pick up changes on next reload; new visitors get it immediately.
 
-| File | Role |
-|---|---|
-| `index.html` | Single page: sound/location gate, hero (next prayer + countdown), prayer list, scheduled events, podcast card, activity log, settings side panel |
-| `css/style.css` | Dark navy + gold Islamic theme, responsive, RTL support for Arabic text |
-| `js/config.js` | Defaults (mirrors the desktop `config.json`) + localStorage persistence (`athan_web_config_v1`) + `CALCULATION_METHODS` list |
-| `js/location.js` | Location detection: browser geolocation → reverse geocode (bigdatacloud) → IP fallback (ipapi.co, ipwho.is — same providers as desktop) |
-| `js/prayer-times.js` | Aladhan API (`api.aladhan.com/v1/timings`, visitor's timezone via `Intl`), per-day localStorage cache, `PRAYER_NAMES` / `PRAYER_LABELS` (en+ar) |
-| `js/audio.js` | `AudioManager`: autoplay unlock, single-player playback, resolves `'ended' | 'stopped' | 'error'` so a manual Stop does **not** chain into the Duaa |
-| `js/scheduler.js` | Builds today's event list from prayer times + config; 1-second tick fires events crossed since last tick (already-passed events don't fire on load); midnight rollover triggers refresh |
-| `js/podcast.js` | Quran playlist (see §5) via YouTube IFrame API |
-| `js/app.js` | Wires everything; UI rendering; settings panel; Test Athan cycling; notifications |
-| `sw.js` | Service worker: app shell network-first, audio cache-first (runtime), never caches cross-origin/API |
-| `manifest.webmanifest` + `assets/icons/` | PWA install (crescent icon: SVG + 180/192/512 PNG) |
-| `assets/audio/*.m4a` | The 11 audio files copied from the desktop app (~63 MB) |
+**Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
+`athan-web`). Note: the automated browser tool used for testing in this project can hold a stale
+HTTP disk-cache per origin/port across server restarts — if verifying a change looks stale,
+spin up a fresh unused port rather than trusting a reload.
 
-## 4. Features (parity with desktop + web extras)
+---
 
-- **Location**: asked via browser prompt on the welcome tap; 📍 header button re-requests;
-  IP fallback; manual lat/lon in Settings. Each visitor gets times for **their** location
-  and timezone. Site states explicitly that times are calculated from latitude & longitude.
-- **Prayer times**: Aladhan API, ISNA (method 2) default, 13 methods selectable, Hijri date shown.
-- **Audio events** (defaults = the user's live desktop config):
-  - Athan at each prayer — **each prayer plays its own named file** from
-    `audio_settings.athan_files` (fajr/dhuhr/asr/maghrib/isha_athan.m4a), falling back to
-    `Azansoundtrack.m4a` only if missing. Volume 0.8.
-  - Woduaa 15 min before each prayer (vol 0.65)
-  - Duaa right after each athan **ends naturally** (vol 0.8; not after manual Stop)
-  - Surat Al-Kahf on **Friday**, Dhuhr **+120 min** (vol 0.8) — weekday stored Python-style (Mon=0, Fri=4); JS conversion `(py+1)%7`
-  - **Morning Azkar** (renamed from "Morning audio"): Dhuhr **−240 min** (vol 0.8)
-  - **Night Azkar** (renamed from "Night audio"): Asr **+135 min** (vol 0.8)
-- **Test Athan button cycles** Fajr → Dhuhr → Asr → Maghrib → Isha → …, playing each
-  prayer's own file; button label shows which prayer plays next; index persists in
-  localStorage (`athan_web_test_index`).
-- **Settings panel**: prayers on/off, method, all volumes, Woduaa lead minutes,
-  auto-detect vs manual location, notifications toggle, reset to defaults.
-- **Other**: live countdown, activity log, "now playing" bar, browser notifications,
-  PWA installable, daily midnight refresh.
-- **Background-tab reliability** (added after user reported athan not firing when minimized):
-  Web Worker clock (exempt from background timer throttling), inaudible keep-alive audio
-  loop started on the welcome tap (marks the tab as playing media → exempt from tab freezing
-  / Memory Saver / App Nap), visibility/focus catch-up with a 10-minute grace window
-  (recently missed events still play; older ones are logged as missed), and an on-page
-  "reliability tips" panel (keep window visible, Chrome Memory Saver exception, play the
-  Quran podcast — audible playback is the strongest keep-alive signal —, install as app,
-  keep the computer awake).
+## 3. Folder map
 
-## 5. Podcast (evolution & current state)
+```
+athan_app/
+├── PROJECT_NOTES.md          ← this file
+├── README.md                 desktop-app install guide (all platforms + menu-bar auto-start)
+├── main.py / main_headless.py            desktop app entry points (GUI / headless)
+├── requirements.txt, requirements-desktop.txt
+├── test_core.py, tests/                  desktop app tests
+├── install.sh, export_for_sharing.sh
+├── config/settings.py                    desktop ConfigManager (JSON config, defaults)
+├── core/                                 desktop engine
+│   ├── audio_player.py                     VLC playback
+│   ├── location_service.py                 geolocation
+│   ├── prayer_times.py                     Aladhan API client
+│   └── scheduler.py                        event scheduling
+├── gui/                                  desktop Tk UI (main window, settings, tray icon)
+├── utils/                                app_paths.py, helpers.py
+├── macos/                                launchd auto-start (menu-bar + headless variants)
+│   ├── com.apa.athan-menubar.plist / install_menubar_agent.sh   ← recommended
+│   └── com.apa.athan-app.plist / install_launch_agent.sh        ← headless
+├── packaging/                            PyInstaller build scripts (macOS .app, Windows)
+├── assets/audio/*.m4a                    11 athan/duaa/azkar recordings (~63 MB, source of truth;
+│                                          docs/assets/audio/ is a copy used by the website)
+├── demo/                                 design playground, NOT deployed (kept for reference)
+│   ├── index.html                          early living-scene prototypes
+│   └── candidates/                         theme-photo comparison pages
+│
+└── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
+    ├── index.html             page shell: sound/location gate, 6 tabs, all panels   (254 lines)
+    ├── manifest.webmanifest   PWA metadata
+    ├── sw.js                  service worker — cache version v18                     (74 lines)
+    ├── README.md              web-app-specific readme
+    ├── css/style.css          full site styling, responsive, RTL Arabic support     (367 lines)
+    ├── js/
+    │   ├── config.js            defaults + localStorage persistence, Safari-safe helpers (165)
+    │   ├── location.js          browser geolocation → reverse-geocode → IP fallback    (92)
+    │   ├── prayer-times.js      Aladhan API client + per-day cache                      (88)
+    │   ├── scheduler.js         builds/fires today's event list, midnight rollover     (157)
+    │   ├── audio.js             single reusable <audio> element, keep-alive loop        (127)
+    │   ├── scene.js             ★ 20-frame living-sky engine (see §5)                  (410)
+    │   ├── podcast.js           Quran player: playlist, seek bar, resume logic          (269)
+    │   └── app.js               wires everything, UI rendering, settings, Test Athan    (399)
+    └── assets/
+        ├── audio/*.m4a           same 11 recordings as desktop (~63 MB)
+        ├── icons/                 PWA icons (SVG + 180/192/512 PNG)
+        └── sky_01.jpg … sky_20.jpg   the 20 painted day/night frames (~3.6 MB total)
+```
 
-1. User's Spotify show: https://open.spotify.com/show/5d4FhdBUAYt220XU5seoUy
-   (المصحف المرتل — الشيخ محمود علي البنا، تسجيلات الإذاعة المصرية).
-2. First attempt: Spotify iframe embed → rejected reasons: can't reorder (newest-first =
-   An-Nas first) and only 30-s previews for logged-out visitors.
-3. Second attempt: mp3quran.net Al-Banna murattal → user said **not identical** to the Spotify recordings.
-4. **Current (correct) version**: the user's YouTube playlist
-   https://www.youtube.com/playlist?list=PL8475A8813886C6A5 ("ختمة مرتّلة") holds the
-   **identical recordings**. Its **first 114 items are exactly surahs 1–114 in Quran order**
-   (items 115+ are a duplicate second series — ignored). The 114 video IDs are hardcoded in
-   `docs/js/podcast.js` (`PODCAST.videoIds`), verified position-by-position.
-   - Playback via **YouTube IFrame API**: click a surah → plays that exact video;
-     auto-advance on end; skip on embed error; **pauses automatically when prayer audio starts**;
-     athan is never interrupted by the podcast.
-   - Playlist UI: 114 rows, Quran order (Al-Fatiha → An-Nas) = the inverse of Spotify's
-     newest-first listing. Links to both Spotify and YouTube kept.
+**Not tracked in git** (gitignored, machine-local only): `.venv/`, `build/`, `dist/`, `__pycache__/`,
+`*.log`, the personal `*.HEIC` photo, and any `*.zip` design deliverables.
+
+---
+
+## 4. Features — current state
+
+**Location & prayer times**
+- Browser geolocation on the welcome tap (📍 header button re-requests); reverse-geocode; IP
+  fallback; manual lat/lon in Settings. Each visitor gets times for **their own** location/timezone.
+- Aladhan API, ISNA default, 13 calculation methods, Hijri date shown.
+
+**Audio events** (each with its own volume, matching the desktop app's live config)
+- Athan — **each prayer plays its own named file**, falls back to the default soundtrack only if missing.
+- Woduaa 15 min before each prayer · Duaa right after each athan **ends naturally** (not after manual Stop)
+- Surat Al-Kahf Fridays, Dhuhr+120 min · **Morning Azkar** Dhuhr−240 min · **Night Azkar** Asr+135 min
+- **Test Athan** button cycles Fajr→Dhuhr→Asr→Maghrib→Isha, playing each prayer's real file in turn.
+
+**The living sky (`scene.js`)** — see §5 for full detail. 20 hand-painted frames of one valley,
+cross-fading through the visitor's real solar day; sun/moon painted directly into the art.
+
+**Quran player** (`podcast.js`)
+- All 114 surahs, Quran order, identical recordings to the user's YouTube playlist
+  (`PL8475A8813886C6A5`), played via the YouTube IFrame API (minimized corner thumbnail — YouTube
+  requires its player stay visible).
+- **Seek bar**: shows each surah's real duration, fills as it plays, drag to scrub forward/back.
+- **Separate volume slider** (independent of athan volume) — fixes "can't lower Quran volume from
+  the tiny YouTube window."
+- **Athan priority**: pauses automatically when prayer audio starts, **auto-resumes** once the full
+  chain (athan + duaa) finishes; pressing Stop cancels the pending resume.
+- **Loops forever**: An-Nas → back to Al-Fatiha.
+
+**Reliability (background/minimized tabs)**
+- Web Worker clock (exempt from background-tab timer throttling)
+- Inaudible keep-alive audio loop, started on the welcome tap (keeps the tab exempt from
+  freezing/Memory Saver/App Nap)
+- 10-minute catch-up grace window for events missed while suspended
+- On-page tips panel; Safari-specific fixes (single reusable user-activated `<audio>` element,
+  no `structuredClone`/`AbortSignal.timeout`, `-webkit-` prefixes)
+
+**Other:** live countdown, activity log, browser notifications, installable PWA, daily midnight
+refresh, **Install tab** linking each platform to the exact README section, per-visitor settings
+isolation (localStorage — one visitor's changes never affect another), **no analytics/tracking**
+(user's explicit choice).
+
+---
+
+## 5. The living sky — how `scene.js` works
+
+20 hand-painted frames of the same valley (`sky_01.jpg`…`sky_20.jpg`), same composition, only the
+light (and sun/moon position) differs. The engine cross-fades continuously between the two frames
+bracketing the current instant, **anchored to the visitor's real prayer/solar times** — not fixed
+clock hours — via `Scene.setTimes({ fajr, sunrise, dhuhr, asr, maghrib, isha })`.
+
+**Exact per-frame schedule** (each verified to land precisely via `Scene._position()`):
+
+| Frame | Arrives at | Note |
+|---|---|---|
+| 1 | **Fajr** exactly | holds 20 min |
+| 2, 3, 4, 5 | evenly divide Fajr+20 → Sunrise | one frame each |
+| 6 | **Sunrise** exactly | sun disc rises — sun visible in frames 6–16 only |
+| 7–16 | sunrise → solar noon → Maghrib | proportional spacing |
+| 17 | **Maghrib − 1 min** | sun already gone |
+| 18 | mid-evening, holds until Isha | dusk |
+| 19 | **Isha** exactly | must already be on screen |
+| 20 | mid-night | "moon mid-sky" bridge frame |
+| → 1 | next **Fajr**, loop closes | |
+
+**Cross-fade length: 30 seconds, uniform everywhere** (`FADE_MAX_MIN = 0.5`). Originally longer
+(up to 6 min, and a special 20-min case for the Isha arrival) — shortened after the user reported
+two suns/two moons briefly visible together, since consecutive frames paint the sun or moon at
+different sky positions. Exact arrival times are untouched; only the blend window shrank.
+
+**Runtime overlays** (drawn on top, not baked into the images): drifting clouds by day, twinkling
+stars + an occasional shooting star at night, bird flocks around dusk, water shimmer. Local
+time + phase name readout, bottom-left (`#sceneReadout`).
+
+**Performance:** only the current + next frame are loaded (never all 20); pauses when the tab is
+hidden. Debug in the browser console: `Scene._debugMinutes = <minutes-since-midnight>` to preview
+any moment; `Scene._debugMinutes = undefined` to return to the real clock.
+
+---
 
 ## 6. Key decisions & constraints (the "why")
 
-- **Browser autoplay policy**: visitors must tap "🔊 Enable Athan & Location" once per visit
-  before audio can play; after that everything is automatic **while the tab stays open**.
-  Phones may suspend locked/background tabs — desktop or installed PWA is most reliable.
-- **Per-visitor isolation**: all settings live in each visitor's own browser localStorage.
-  Person A changing volume/location/etc. never affects person B or the site itself.
-  Only the repo owner can change the actual website (public repo, but write access = owner only).
-- **No analytics / no tracking** — offered GoatCounter/GA4/Cloudflare; **user chose "No tracking"**
-  (2026-07-15). So there is deliberately no visitor data (counts, countries, playtime).
-  If ever wanted: user creates the analytics account themselves, then a small snippet gets added.
-- **Bug found & fixed during testing**: pressing Stop during the athan used to chain into
-  the after-prayer Duaa. `AudioManager.play()` now resolves a reason; Duaa only on `'ended'`.
-- The user's personal photo (`*.HEIC`) is **gitignored** — never push it to the public repo.
-- Prayer times use latitude/longitude (+timezone) — *not* altitude (user once said "altitude",
-  wording on-site says latitude & longitude).
+- **Browser autoplay policy**: one tap ("🔊 Enable Athan & Location") unlocks audio per visit;
+  after that, everything fires automatically **while the tab stays open**.
+- **Per-visitor isolation**: all settings in each visitor's own `localStorage` — no shared state,
+  no server. Only the repo owner can change the site itself.
+- **No analytics** — user explicitly declined (GoatCounter/GA4/Cloudflare were offered).
+- **Sun/moon timing precision**: two rounds of bugs fixed by literally opening each painted frame
+  and checking where the sun/moon actually sits, rather than trusting index labels — the anchors
+  now match the art exactly.
+- Personal `*.HEIC` photo and any `*.zip` deliverables are gitignored — never pushed to the public repo.
 
-## 7. Timeline of work (all on 2026-07-15)
+---
 
-1. Explored desktop app; copied its behavior/config as web defaults.
-2. Built `web/` (now `docs/`): full JS port, PWA, tested end-to-end locally (schedule math,
-   athan→duaa chain, settings, mobile layout, all 11 audio files).
-3. Installed `gh` CLI (Homebrew); user authorized via device flow (`aparsi0`).
-4. Created public repo, hit workflow-scope limit → renamed `web/`→`docs/`, enabled
-   branch-based Pages → **live**; verified on public URL.
-5. Added: explicit location button + gate wording; Spotify embed (v1 podcast).
-6. Replaced podcast with mp3quran playlist (v2) + Morning/Night **Azkar** renames +
-   location statement on page.
-7. Replaced podcast source with the **YouTube playlist** (v3, identical recordings) +
-   **Test Athan per-prayer cycling**. Verified live.
-8. Answered: sharing/autoplay behavior, no-analytics decision, per-visitor settings isolation.
-9. Wrote this file.
-10. **Background-tab reliability fixes** (user reported athan only firing in the focused tab):
-    Web Worker clock, inaudible keep-alive loop, 10-min grace catch-up, tips panel (sw v5).
-11. Added tip that playing the Quran podcast keeps the tab active (sw v6).
+## 7. Condensed changelog
 
-## 9. How updates reach visitors
-
-Site changes go live at the same URL ~1 minute after `git push`. The service worker fetches
-the app shell **network-first**, so visitors get the new version on their next page load or
-refresh — no reinstall, no cache clearing. Tabs that are already open keep running the old
-code until reloaded (one refresh + the usual welcome tap).
-
-## 7b. Living-scene redesign (2026-07-19)
-
-Prototyped in `demo/` (kept for reference; not deployed), then shipped to `docs/`:
-- **Layout**: QuantumPT-inspired — centered brand + tab bar (Athan / Schedule / Quran /
-  Activity / Settings). Athan is the main tab. Old side-drawer settings became the
-  Settings tab; the podcast card became the Quran tab.
-- **`docs/js/scene.js`**: canvas scene engine driven by the visitor's REAL sun times.
-  Draw order sky → stars → sun/moon(+glow) → terrain, so celestial bodies rise/set
-  BEHIND the landscape and stars are occluded by it. Sun is a warm bloom near the
-  horizon, subtle glare at midday; moon is a crescent sprite; light reflects on water.
-- **2026-07-19 later revision (current)**: user found the sky-cut versions ugly →
-  themes now show the ORIGINAL uncropped photos (`assets/photo_a..e.jpg`, small JPEGs) and
-  the scene engine does LIGHTING ONLY: brightness/saturation by time of day, cool night
-  cast, warm dawn/sunset glow. No drawn sun/moon/stars, no canvas — layered divs
-  (#photo/#shade/#glow) with CSS transitions. terrain_*/ridge_* assets deleted; sw v9.
-- **Themes = exactly five real-photo landscapes** (user's choice, replacing the earlier
-  art/classic set; old saved values migrate to `d`). Values `a`–`e` in `ui_settings.theme`,
-  assets `terrain_X.png` + `ridge_X.json`, lazy-loaded per selected theme (sw v8 caches
-  them at runtime, not precache). Source photos (Unsplash): a=1464822759023 Alpine Valley,
-  b=1458668383970 Above the Clouds, c=1476514525535 Mountain Lake (boat), d=1439066615861
-  Lake Dock (default), e=1469474968028 Golden Valley. Segmentation: per-column vertical-
-  smoothness scan; d uses the precise blue-sky method (tree-tip detail); a/b/e use a
-  windowed low-quantile skyline envelope (clouds kept as terrain in a).
-- **Install tab** on the site: per-platform cards (🌙 macOS menu-bar,  M1/2/3, 🖥 Intel,
-  🪟 Windows, 🐧 Linux, ⚙️ headless, ✅ verify) hyperlinking to the exact GitHub README
-  anchors (verified against GitHub's rendered ids), plus phone add-to-home-screen note.
-- **Quran tab**: audio-style player (⏮ ⏯ ⏭ + 114-surah list, auto-advance, skip on embed
-  error) controlling a minimized corner YouTube player (YouTube requires its player to be
-  visible; tap to enlarge). Global object still named `Podcast` — the athan pipeline calls
-  `Podcast.pause()` for priority.
-- Sky-segmentation pipeline (venv with Pillow/numpy, per-column blue-sky scan) lives in the
-  scratchpad; to swap the photo, re-run it on any image with a clean skyline.
-- sw.js v7 (added scene.js, terrain.png ~2.2 MB, ridge.json). All prior behavior preserved.
-- User declined an insect-repelling keep-alive frequency after science/hardware/ethics
-  explanation (ultrasonics don't repel roaches; speakers can't emit >20 kHz; audible-to-kids
-  risk). Keep-alive track confirmed harmless to speakers.
-
-## 7c. Final scene state (2026-07-19 evening — CURRENT)
-
-After trying five photo themes and a lighting-only mode, the user settled on:
-- **One theme only: Lake Dock**, rendered with the full living-sky canvas engine
-  (`terrain_d.png` sky-cut photo + `ridge_d.json` treeline): sun & moon rise/set behind
-  the treeline, stars occluded, light reflections on the water. Theme picker REMOVED
-  (`ui_settings.theme` ignored). Other theme photos deleted; pipeline still in scratchpad.
-- **Separate Quran volume**: slider in the Quran player bar (`audio_settings.quran_volume`,
-  default 0.8) applied via YouTube setVolume — independent of athan volume.
-- **Safari compatibility** (user reported "not working in Safari"): removed
-  structuredClone / AbortSignal.timeout / Array.at(-1) (fetchWithTimeout + deepClone
-  helpers in config.js), -webkit-backdrop-filter prefixes, and AudioManager refactored to
-  ONE reusable user-activated <audio> element (Safari only allows play() on elements the
-  user directly activated). sw v11.
-
-## 7d. Animated painted theme (2026-07-20 — CURRENT)
-
-User produced 19 hand-painted frames of one valley (via Claude design) covering the whole
-day; integrated as the site's only theme, replacing the Lake Dock photo scene:
-- `docs/assets/sky_01..19.jpg` + `sky_night_hold.jpg` (recompressed from the 95 MB PNG
-  delivery to 3.6 MB total; source zip + extracted folder are gitignored in the repo root).
-- `docs/js/scene.js` (from the design delivery, lightly patched): continuous cross-fade
-  between the two frames bracketing "now", anchored to the visitor's REAL solar moments
-  via Scene.setTimes (Fajr/sunrise/noon/sunset/Isha) — never fixed clock hours. Runtime
-  overlays: drifting clouds (day), twinkling stars + shooting star (~30 s, night), bird
-  flocks (Asr−45 min→Maghrib), water shimmer. Deep-night HOLD frame 23:00–01:00 prevents
-  two moon paintings cross-fading into a two-moon sky (patched its phase label).
-  Only current+next frames are loaded; rAF pauses when tab hidden.
-  Debug: set `Scene._debugMinutes = <minutes>` in the console to preview any time.
-- Readout chip `#sceneReadout` bottom-left: "8:45 AM · Morning". sw v12.
-
-## 7e. Quran resume + playlist loop (2026-07-20)
-
-- Prayer audio (athan/woduaa/azkar/duaa) pauses the Quran and now AUTO-RESUMES it once the
-  chain fully finishes (`Podcast.pause()` remembers, `Podcast.maybeResume()` fires after the
-  awaits in `App.handleEvent` and after Test Athan). Stop button calls `Podcast.cancelResume()`
-  — manual stop never auto-resumes. The 114-surah playlist loops (An-Nas → Al-Fatiha).
-- Audio unlock probe is volume-0 (NOT muted): Chromium force-pauses muted media in
-  background tabs, which failed the unlock. sw v14.
+1. Explored desktop app; built `docs/` (originally `web/`) as a full-parity browser port; deployed
+   to GitHub Pages via branch-based serving (Actions workflow blocked by OAuth scope).
+2. Podcast iterated three times: Spotify embed (rejected — no reordering, 30s previews) → mp3quran
+   (wrong recordings) → **YouTube playlist** (identical recordings, verified position-by-position).
+3. Renamed Morning/Night audio → **Azkar**; added Test Athan per-prayer cycling; explicit location
+   button; no-tracking decision.
+4. **Background-tab reliability**: Web Worker clock, keep-alive audio loop, catch-up grace window,
+   on-page tips — after athan silently stopped firing when the tab was minimized.
+5. Added macOS menu-bar auto-start install docs (matching the user's actual working launchd setup)
+   and an M1/M2/M3 VLC-architecture troubleshooting note.
+6. **Living-scene redesign**: tabbed layout (Athan/Schedule/Quran/Install/Activity/Settings);
+   several visual iterations (canvas art mountains → 5 real-photo themes → lighting-only mode →
+   single Lake Dock photo) before landing on the current approach.
+7. **Final scene**: user commissioned 20 custom-painted frames (via Claude design) covering a full
+   day/night cycle; integrated with real solar-time anchoring, then debugged twice — first so the
+   sun never appears before Sunrise/after Maghrib, then so cross-fades never show two suns/moons
+   at once (30-second uniform fade).
+8. **Quran player polish**: separate volume slider, auto-resume after prayer audio interrupts it,
+   infinite playlist loop, drag-to-seek progress bar with live per-surah duration.
+9. **Safari compatibility pass**: removed unsupported APIs, fixed the autoplay-unlock probe, moved
+   to one reusable audio element (Safari only allows `play()` on a user-activated element).
 
 ## 8. Possible future ideas (not requested yet)
 
-- Analytics (only if the user changes their mind — see §6).
-- Custom domain for the site (Pages supports CNAME).
-- Re-adding a GitHub Actions deploy (needs `gh auth refresh -s workflow` re-authorization).
-- Monthly prayer-times table view; more languages; adjustable Al-Kahf/Azkar offsets in UI
-  (currently config-level defaults only).
+- Analytics (only if the user changes their mind)
+- Custom domain (GitHub Pages supports CNAME)
+- Re-enable GitHub Actions deploy (needs `gh auth refresh -s workflow`)
+- Monthly prayer-times table view, more languages, in-UI offset controls for Al-Kahf/Azkar timing
