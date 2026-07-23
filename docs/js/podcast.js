@@ -75,7 +75,8 @@ const Podcast = {
     document.getElementById('playBtn').addEventListener('click', () => {
       if (this.idx == null) { this.play(0); return; }
       if (!this.ready) return;
-      this.playing ? this.player.pauseVideo() : this.player.playVideo();
+      if (this.playing) { this._shouldBePlaying = false; this.player.pauseVideo(); }
+      else { this._shouldBePlaying = true; this.player.playVideo(); }
     });
     document.getElementById('prevBtn').addEventListener('click', () => {
       if (this.idx != null && this.idx > 0) this.play(this.idx - 1);
@@ -96,6 +97,7 @@ const Podcast = {
     });
 
     this._bindSeek();
+    this._startWatchdog();
   },
 
   /** Seek bar: shows this surah's duration, fills as it plays, and can be
@@ -177,6 +179,8 @@ const Podcast = {
       return;
     }
     this._resumeWanted = false; // manual start supersedes any pending auto-resume
+    this._shouldBePlaying = true;
+    this._consecErrors = 0;
     this.idx = i;
     document.getElementById('ytThumb').style.display = 'block';
     document.getElementById('piTitle').textContent = `سورة ${PODCAST.surahs[i]}`;
@@ -216,7 +220,7 @@ const Podcast = {
           },
           onStateChange: (e) => {
             this.playing = e.data === YT.PlayerState.PLAYING;
-            if (this.playing) this._applyVolume();
+            if (this.playing) { this._applyVolume(); this._consecErrors = 0; }
             document.getElementById('playBtn').textContent = this.playing ? '⏸' : '▶';
             if (e.data === YT.PlayerState.ENDED) {
               // Loop the playlist: after سورة الناس (114), start again at الفاتحة.
@@ -226,6 +230,14 @@ const Podcast = {
             }
           },
           onError: () => {
+            // Guard against a tight failure loop (e.g. connection is down and
+            // every surah errors instantly) instead of hammering forever.
+            this._consecErrors = (this._consecErrors || 0) + 1;
+            if (this._consecErrors >= 5) {
+              App.logStatus('⚠️ The Quran keeps failing to load — check your internet connection, then press play to try again.');
+              this._shouldBePlaying = false;
+              return;
+            }
             App.logStatus(`⚠️ سورة ${PODCAST.surahs[this.idx]} could not play — skipping to the next one.`);
             this.play((this.idx + 1) % PODCAST.videoIds.length);
           }
@@ -246,6 +258,7 @@ const Podcast = {
   pause() {
     if (this.ready && this.player?.pauseVideo) {
       if (this.playing) this._resumeWanted = true;
+      this._shouldBePlaying = false; // deliberate pause — the watchdog must not fight it
       try { this.player.pauseVideo(); } catch { /* player may be gone */ }
     }
   },
@@ -255,6 +268,7 @@ const Podcast = {
   maybeResume() {
     if (this._resumeWanted && this.ready && this.player?.playVideo && !AudioManager.isPlaying()) {
       this._resumeWanted = false;
+      this._shouldBePlaying = true;
       try {
         this.player.playVideo();
         App.logStatus('🎙 Prayer audio finished — resuming the Quran.');
@@ -265,5 +279,53 @@ const Podcast = {
   /** Forget any pending auto-resume (user pressed Stop — they want silence). */
   cancelResume() {
     this._resumeWanted = false;
+    this._shouldBePlaying = false;
+  },
+
+  /**
+   * YouTube's iframe can be silently paused or stalled by the browser
+   * (background-tab throttling, a network hiccup) without ever firing a
+   * state-change or error event we'd otherwise react to. This watchdog
+   * compares what SHOULD be happening (`_shouldBePlaying`) against what the
+   * player actually reports, and nudges it back to life when they disagree.
+   */
+  _startWatchdog() {
+    if (this._watchdog) return;
+    this._watchdog = setInterval(() => this._checkStuck(), 6000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this._checkStuck();
+    });
+  },
+
+  _checkStuck() {
+    if (!this._shouldBePlaying || !this.ready || this.idx == null || !this.player?.getPlayerState) return;
+    let state, current;
+    try {
+      state = this.player.getPlayerState();
+      current = this.player.getCurrentTime();
+    } catch { return; }
+
+    // Should be playing, but YouTube reports paused/unstarted/cued — nudge it.
+    // (Numeric literals, not YT.PlayerState — that global may not exist yet
+    // in every edge case, and the values are a stable part of the API:
+    // 1 = playing, 3 = buffering.)
+    if (state !== 1 && state !== 3) {
+      try { this.player.playVideo(); } catch { /* player may be gone */ }
+      return;
+    }
+
+    // Reports "playing" but currentTime is frozen — a silent stall.
+    if (Number.isFinite(current)) {
+      const now = Date.now();
+      if (current === this._lastYtTime) {
+        if (this._lastYtTimeAt && now - this._lastYtTimeAt > 12000) {
+          try { this.player.seekTo(current, true); this.player.playVideo(); } catch { /* ignore */ }
+          this._lastYtTimeAt = now; // avoid renudging every tick
+        }
+      } else {
+        this._lastYtTime = current;
+        this._lastYtTimeAt = now;
+      }
+    }
   }
 };

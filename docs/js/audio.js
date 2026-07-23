@@ -106,6 +106,7 @@ const AudioManager = {
    * Must be started from a user gesture (the welcome tap provides one).
    */
   startKeepAlive() {
+    this._startWatchdog();
     if (this._keepAlive) return;
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -122,6 +123,55 @@ const AudioManager = {
       setInterval(() => { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); }, 30000);
     } catch (e) {
       console.warn('Keep-alive audio unavailable', e);
+    }
+  },
+
+  /**
+   * Some browsers silently pause or stall media (background-tab throttling,
+   * a network hiccup, an OS media-session interruption) WITHOUT ever firing
+   * 'ended' or 'error' — so play()'s promise never resolves, and anything
+   * waiting on it (like the Quran's auto-resume) hangs forever. This
+   * watchdog notices and recovers: nudges paused/stalled playback back to
+   * life, and if it truly can't recover after a long while, force-resolves
+   * the stuck play() as 'error' so the rest of the app isn't blocked.
+   */
+  _startWatchdog() {
+    if (this._watchdog) return;
+    this._watchdog = setInterval(() => this._checkStuck(), 5000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this._checkStuck();
+    });
+  },
+
+  _checkStuck() {
+    const a = this._active;
+    const el = this.el;
+    if (!a || a.stopped || !el) { this._stuckSince = null; return; }
+    const now = Date.now();
+
+    if (el.paused) {
+      if (this._stuckSince == null) this._stuckSince = now;
+      el.play().catch(() => {});
+      if (now - this._stuckSince > 10 * 60 * 1000) { // stuck 10+ min: stop waiting on it
+        console.warn(`Playback stuck for "${this.currentLabel}" — giving up so the app can continue.`);
+        this._stuckSince = null;
+        this._finish(a.token, 'error');
+      }
+      return;
+    }
+    this._stuckSince = null;
+
+    // "Playing" per the browser but currentTime frozen — a silent stall.
+    if (el.currentTime === this._lastTime) {
+      if (this._lastTimeAt && now - this._lastTimeAt > 15000) {
+        console.warn(`Playback stalled for "${this.currentLabel}" — nudging.`);
+        el.currentTime = el.currentTime; // re-assigning can kick a stalled element
+        el.play().catch(() => {});
+        this._lastTimeAt = now; // avoid renudging every tick
+      }
+    } else {
+      this._lastTime = el.currentTime;
+      this._lastTimeAt = now;
     }
   }
 };
