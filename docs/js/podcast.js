@@ -181,6 +181,13 @@ const Podcast = {
     this._resumeWanted = false; // manual start supersedes any pending auto-resume
     this._shouldBePlaying = true;
     this._consecErrors = 0;
+    // Reset stall-tracking for the new surah — otherwise a stale currentTime
+    // left over from whatever was playing before could make the watchdog
+    // misjudge this fresh video as already "stuck".
+    this._lastYtTime = null;
+    this._lastYtTimeAt = null;
+    this._stallNudges = 0;
+    this._loadedAt = Date.now();
     this.idx = i;
     document.getElementById('ytThumb').style.display = 'block';
     document.getElementById('piTitle').textContent = `سورة ${PODCAST.surahs[i]}`;
@@ -269,6 +276,12 @@ const Podcast = {
     if (this._resumeWanted && this.ready && this.player?.playVideo && !AudioManager.isPlaying()) {
       this._resumeWanted = false;
       this._shouldBePlaying = true;
+      // Resuming can also involve a brief re-buffer — give it the same grace
+      // period a fresh surah gets before the stall watchdog judges it.
+      this._loadedAt = Date.now();
+      this._lastYtTime = null;
+      this._lastYtTimeAt = null;
+      this._stallNudges = 0;
       try {
         this.player.playVideo();
         App.logStatus('🎙 Prayer audio finished — resuming the Quran.');
@@ -314,18 +327,37 @@ const Podcast = {
       return;
     }
 
-    // Reports "playing" but currentTime is frozen — a silent stall.
-    if (Number.isFinite(current)) {
-      const now = Date.now();
-      if (current === this._lastYtTime) {
-        if (this._lastYtTimeAt && now - this._lastYtTimeAt > 12000) {
-          try { this.player.seekTo(current, true); this.player.playVideo(); } catch { /* ignore */ }
-          this._lastYtTimeAt = now; // avoid renudging every tick
-        }
-      } else {
-        this._lastYtTime = current;
-        this._lastYtTimeAt = now;
-      }
+    if (!Number.isFinite(current)) return;
+    const now = Date.now();
+
+    if (this._lastYtTime == null || current !== this._lastYtTime) {
+      this._lastYtTime = current;
+      this._lastYtTimeAt = now;
+      this._stallNudges = 0; // real progress — clear any nudge streak
+      return;
     }
+
+    // currentTime hasn't moved since the last check. A fresh surah gets a
+    // grace period first — a brief pause in the first ~15s after loading is
+    // normal buffering, not a stall, and judging it too early was exactly
+    // what caused "stuck at a few seconds, forever": seeking to the position
+    // it's already frozen at doesn't fetch anything new, so it just recreated
+    // the same hiccup on repeat.
+    const justLoaded = this._loadedAt && now - this._loadedAt < 15000;
+    if (justLoaded) return;
+    if (!this._lastYtTimeAt || now - this._lastYtTimeAt < 15000) return;
+
+    this._stallNudges = (this._stallNudges || 0) + 1;
+    if (this._stallNudges <= 2) {
+      // Gentle first: just ask it to keep playing, no re-seek.
+      try { this.player.playVideo(); } catch { /* ignore */ }
+    } else {
+      // Still frozen after gentle nudges — request a genuinely fresh stream
+      // at the same position, rather than repeating an ineffective same-spot seek.
+      try { this.player.loadVideoById(PODCAST.videoIds[this.idx], current); } catch { /* ignore */ }
+      this._loadedAt = Date.now(); // give the fresh load its own grace period
+      this._stallNudges = 0;
+    }
+    this._lastYtTimeAt = now; // avoid renudging every tick
   }
 };
