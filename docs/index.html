@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Content-Security-Policy: defense-in-depth so any future markup bug can't
+       run injected script. Scoped to exactly what the app needs:
+         script/frame  → YouTube player (iframe_api + s.ytimg.com)
+         connect       → the prayer-time & geolocation APIs
+         worker blob:  → the background-clock Web Worker (scheduler.js) — MUST
+                         stay, or the athan scheduler breaks in background tabs
+         style inline  → the handful of inline style attributes in this file
+       No 'unsafe-inline'/'unsafe-eval' for scripts: the app has no inline
+       scripts or event handlers, so script injection is fully blocked. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://api.aladhan.com https://api.bigdatacloud.net https://ipapi.co https://ipwho.is https://www.youtube.com; img-src 'self' data: https://i.ytimg.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; media-src 'self'; worker-src blob:; child-src blob: https://www.youtube.com; object-src 'none'; base-uri 'self'; manifest-src 'self'; form-action 'none'" />
   <title>Athan Web — Prayer Times & Automatic Athan</title>
   <meta name="description" content="Automatic Islamic prayer times with athan, duaa and reminder audio — works anywhere in your browser." />
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml" />
@@ -214,6 +224,10 @@
             Lat <input type="number" id="manualLat" step="0.0001" />
             Lon <input type="number" id="manualLon" step="0.0001" />
           </div>
+          <p class="hint">🔒 Your coordinates (and, for auto-detect, your IP address) are sent only to the
+            prayer-time and geocoding services that need them — Aladhan, BigDataCloud, ipapi and ipwho —
+            to calculate your times. Nothing is stored on any server, and there is no tracking or analytics.
+            All your settings stay in this browser only.</p>
 
           <h4>Notifications</h4>
           <label><input type="checkbox" id="showNotifs" /> Show browser notifications</label>

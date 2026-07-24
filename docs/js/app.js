@@ -74,6 +74,9 @@ const App = {
   // ---------- prayer times ----------
 
   async loadPrayerTimes() {
+    // Cancel any pending retry so overlapping callers (midnight refresh,
+    // settings save, a prior failure) can't stack multiple retry loops.
+    if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null; }
     const method = Config.get('prayer_settings.calculation_method', 2);
     try {
       this.logStatus('Fetching today\'s prayer times…');
@@ -91,7 +94,7 @@ const App = {
     } catch (e) {
       console.error(e);
       this.logStatus('⚠️ Could not fetch prayer times. Retrying in 60 s…');
-      setTimeout(() => this.loadPrayerTimes(), 60000);
+      this._retryTimer = setTimeout(() => { this._retryTimer = null; this.loadPrayerTimes(); }, 60000);
     }
   },
 
