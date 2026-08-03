@@ -2,7 +2,7 @@
 
 > Compact reference: current features, full folder map, and a condensed changelog.
 > Read this first in any new session — it replaces re-deriving context from scratch.
-> Last updated: **2026-07-21**.
+> Last updated: **2026-08-02**.
 
 ---
 
@@ -24,7 +24,7 @@ git add -A && git commit -m "..." && git push
 ```
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v18**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v21**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -203,6 +203,19 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
    infinite playlist loop, drag-to-seek progress bar with live per-surah duration.
 9. **Safari compatibility pass**: removed unsupported APIs, fixed the autoplay-unlock probe, moved
    to one reusable audio element (Safari only allows `play()` on a user-activated element).
+10. **Sun/moon timing fix (2026-08-02)**: re-examined all 20 painted frames directly and re-anchored
+    the scene so sun/moon arrive exactly when they should appear/disappear (Sunrise→frame 6, Maghrib→frame 17).
+11. **Quran seek bar**: added live duration display, drag-to-scrub playback, fills as video plays.
+    Each surah reads its own real duration from the player, so the bar is accurate for all 114.
+12. **Playback watchdog recovery**: fixed athan/Quran sometimes stopping and never resuming by adding
+    watchdog timers that detect silently-paused or stalled media (browser background-tab throttling,
+    network hiccups) and nudge playback back to life. Athan gets 10-minute stuck timeout; Quran gets
+    graceful 15-second startup buffering + progressive recovery (gentle nudges before reloading).
+13. **Security hardening (2026-08-02)**: added enforced Content-Security-Policy (verified live under
+    attack scenarios), privacy note in Settings, and guarded prayer-times fetch retry loop to prevent
+    stacking. CSP allows only what's needed: YouTube player, four API origins, blob: Web Worker.
+14. **Inaudible keep-alive verified**: confirmed the background audio loop that keeps tabs alive
+    during prayer times (original feature from earlier, still active and working).
 
 ## 8. Possible future ideas (not requested yet)
 
