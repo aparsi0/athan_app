@@ -24,7 +24,7 @@ git add -A && git commit -m "..." && git push
 ```
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v22**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v23**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -63,9 +63,9 @@ athan_app/
 │   └── candidates/                         theme-photo comparison pages
 │
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
-    ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (320 lines)
+    ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (325 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v22                     (75 lines)
+    ├── sw.js                  service worker — cache version v23                     (75 lines)
     ├── README.md              web-app-specific readme
     ├── css/style.css          full site styling, responsive, RTL Arabic support     (368 lines)
     ├── js/
@@ -76,7 +76,7 @@ athan_app/
     │   ├── audio.js             single reusable <audio> element, keep-alive loop        (177)
     │   ├── scene.js             ★ 20-frame living-sky engine (see §5)                  (410)
     │   ├── podcast.js           Quran tab 1 — YouTube playlist, seek bar, resume logic  (365)
-    │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (350)
+    │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (396)
     │   └── app.js               wires everything, UI rendering, settings, Test Athan    (410)
     └── assets/
         ├── audio/*.m4a           same 11 recordings as desktop (~63 MB)
@@ -199,6 +199,11 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
   healthy (`n12`, `n0b`, `n0e`…), and CSP validates the *redirect target* — pinning single hosts
   silently blocked the radio. Adding any new audio source means adding its host to `media-src`
   in `docs/index.html`.
+- **Third-party audio is a privacy boundary, not a security one**: an `<audio>` element cannot
+  execute code, so a hostile audio host can only serve wrong audio — but it does see each
+  listener's IP. Hence `preload="none"` (opening a Quran tab sends nothing until play is pressed),
+  `<meta name="referrer" content="no-referrer">`, and the Settings privacy note naming the hosts.
+  The service worker deliberately ignores cross-origin requests, so streams are never cached.
 
 ---
 
@@ -244,6 +249,13 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     registry; extended CSP `media-src` to el-hosary.com, radio.garden and `*.radiojar.com`.
     First attempt looked broken because CSP blocked the radio's redirect target — fixed with the
     wildcard, then all sources verified loading under the live policy. Bumped sw.js to v22.
+16. **Quran player hardening (2026-08-18)**: fixed a real loop — the 5-strike give-up guard could
+    never fire, because the error path's `play()` call reset the counter, so an unreachable host
+    walked all 114 surahs forever logging a warning each time. Failure count now clears only on
+    actual playback or a real click. Added per-track source fallback (`sources[]` for المصحف
+    المعلم, same mechanism the radio already used), exponential reconnect backoff (3→48s, was a
+    flat 3s), and a radio give-up message pointing at المصحف المعلم. Privacy: `no-referrer` and a
+    Settings note naming the streaming hosts. sw.js v23.
 
 ## 8. Possible future ideas (not requested yet)
 
@@ -251,6 +263,13 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
 - Custom domain (GitHub Pages supports CNAME)
 - Re-enable GitHub Actions deploy (needs `gh auth refresh -s workflow`)
 - Monthly prayer-times table view, more languages, in-UI offset controls for Al-Kahf/Azkar timing
+- **Mirror hosts for المصحف المعلم**: the fallback mechanism is in place but `sources` holds one
+  host, so a single outage still stops that tab. Purpose-built Quran CDNs (mp3quran.net,
+  everyayah.com, cdn.islamic.network, quranicaudio.com) expect hotlinking, unlike el-hosary.com —
+  each needs its URL shape checked and its host added to `media-src`.
+- **Bundle the most-played surahs**: Al-Fatiha, Ya-Sin, Al-Mulk, Al-Waqi'ah and the last juz at
+  48–64 kbps mono (~50–100 MB) would play offline and survive any outage. Hosting all 114 is not
+  an option — GitHub Pages caps a site at 1 GB and the full teaching mushaf exceeds that.
 - **More reciters**: additional full-mushaf sheikhs with a reciter selector, remembered per
   visitor. el-hosary.com already hosts several more mushafs in the same URL shape
   (المجود، المفسر، حفص الإذاعة المصرية، ورش، قالون) — cheapest next source.
