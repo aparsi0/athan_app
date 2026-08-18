@@ -38,6 +38,7 @@ function makeAudioPlayer(opts) {
     playing: false,
     _resumeWanted: false,
     _shouldBePlaying: false,
+    _failStreak: 0,   // consecutive load failures; only a real 'playing' clears it
 
     init() {
       const el = (id) => document.getElementById(id);
@@ -52,28 +53,29 @@ function makeAudioPlayer(opts) {
             const li = document.createElement('li');
             li.dataset.i = i;
             li.innerHTML = `<span class="snum">${i + 1}</span><span class="sname">سورة ${name}</span>`;
-            li.addEventListener('click', () => this.play(i));
+            li.addEventListener('click', () => this.play(i, true));
             ol.appendChild(li);
           });
         }
         el(opts.ids.prev).addEventListener('click', () => {
-          if (this.idx != null && this.idx > 0) this.play(this.idx - 1);
+          if (this.idx != null && this.idx > 0) this.play(this.idx - 1, true);
         });
         el(opts.ids.next).addEventListener('click', () => {
-          if (this.idx != null && this.idx < opts.tracks.length - 1) this.play(this.idx + 1);
+          if (this.idx != null && this.idx < opts.tracks.length - 1) this.play(this.idx + 1, true);
         });
         this._bindSeek();
       }
 
       this.playBtn.addEventListener('click', () => {
-        if (opts.tracks && this.idx == null) { this.play(0); return; }
-        if (!opts.tracks && !this._started) { this.play(0); return; }
+        if (opts.tracks && this.idx == null) { this.play(0, true); return; }
+        if (!opts.tracks && !this._started) { this.play(0, true); return; }
         if (this.playing) {
           this._shouldBePlaying = false;
           this.audio.pause();
         } else {
           QuranPlayers.silenceOthers(this);
           this._shouldBePlaying = true;
+          this._failStreak = 0;   // pressing play is a fresh start, as above
           this.audio.play().catch(() => {});
         }
       });
@@ -86,7 +88,7 @@ function makeAudioPlayer(opts) {
       });
       this._volEl = vol;
 
-      this.audio.addEventListener('playing', () => this._setPlaying(true));
+      this.audio.addEventListener('playing', () => { this._failStreak = 0; this._setPlaying(true); });
       this.audio.addEventListener('pause', () => this._setPlaying(false));
       this.audio.addEventListener('ended', () => {
         this._setPlaying(false);
@@ -112,8 +114,13 @@ function makeAudioPlayer(opts) {
       this.audio.volume = Math.max(0, Math.min(1, Number(Config.get(opts.volumeKey, 0.8))));
     },
 
-    /** Start track `i` (index ignored for the single-stream radio). */
-    play(i) {
+    /**
+     * Start track `i` (index ignored for the single-stream radio).
+     * `userInitiated` marks a real click, which forgives an earlier failure
+     * streak — auto-advance and error-recovery must not, or a dead host
+     * would loop through all 114 surahs forever.
+     */
+    play(i, userInitiated) {
       if (AudioManager.isPlaying()) {
         App.logStatus('⚠️ Prayer audio is playing — the Quran will not interrupt it.');
         return;
@@ -122,14 +129,15 @@ function makeAudioPlayer(opts) {
       this._resumeWanted = false;
       this._shouldBePlaying = true;
       this._started = true;
-      this._errors = 0;
+      this._srcTry = 0;                       // each new item starts at the primary source
+      if (userInitiated) this._failStreak = 0;
       this._lastTime = null;
       this._lastTimeAt = null;
       this._loadedAt = Date.now();
 
       if (opts.tracks) {
         this.idx = i;
-        this.audio.src = opts.srcFor(i);
+        this.audio.src = opts.srcFor(i, this._srcTry);
         document.getElementById(opts.ids.title).textContent = `سورة ${opts.tracks[i]}`;
         document.getElementById(opts.ids.sub).textContent = `${i + 1} / ${opts.tracks.length} · ${opts.reciter}`;
         document.querySelectorAll(`#${opts.ids.list} li`).forEach((li) =>
@@ -138,7 +146,7 @@ function makeAudioPlayer(opts) {
         App.logStatus(`${opts.icon} ${opts.name} — سورة ${opts.tracks[i]} (${i + 1}/${opts.tracks.length})`);
       } else {
         this.idx = 0;
-        this.audio.src = opts.srcFor(0);
+        this.audio.src = opts.srcFor(0, this._srcTry);
         App.logStatus(`${opts.icon} ${opts.name} — connecting to the live stream…`);
       }
       this._applyVolume();
@@ -232,19 +240,50 @@ function makeAudioPlayer(opts) {
 
     // ---------- robustness ----------
 
+    /** 3s, 6s, 12s, 24s, 48s — then hold at a minute. */
+    _backoffMs() {
+      return Math.min(3000 * Math.pow(2, Math.min(this._failStreak || 1, 5) - 1), 60000);
+    },
+
+    /** Reload the current track from whichever source `_srcTry` points at. */
+    _loadCurrent() {
+      this.audio.src = opts.srcFor(this.idx, this._srcTry);
+      this._loadedAt = Date.now();
+      this._applyVolume();
+      this.audio.play().catch(() => {});
+    },
+
     _onError() {
       if (!this._shouldBePlaying) return;
-      this._errors = (this._errors || 0) + 1;
-      if (this._errors >= 5) {
-        App.logStatus(`⚠️ ${opts.name} keeps failing to load — check your connection, then press play.`);
+      this._failStreak = (this._failStreak || 0) + 1;
+
+      // A track player tries the same surah from its other sources before it
+      // gives up on that surah — a mirror being down is not a missing surah.
+      if (opts.tracks) {
+        const nSources = (opts.sources && opts.sources.length) || 1;
+        if ((this._srcTry || 0) + 1 < nSources) {
+          this._srcTry += 1;
+          App.logStatus(`⚠️ سورة ${opts.tracks[this.idx]} — trying another source…`);
+          this._loadCurrent();
+          return;
+        }
+      }
+
+      if (this._failStreak >= 5) {
+        App.logStatus(opts.tracks
+          ? `⚠️ ${opts.name} — nothing is loading from the audio host. Check your connection, then press play.`
+          : `⚠️ ${opts.name} — every stream address failed. The station may be off air; المصحف المعلم still works.`);
         this._shouldBePlaying = false;
         return;
       }
+
       if (!opts.tracks) {
-        App.logStatus(`⚠️ ${opts.name} stream dropped — reconnecting…`);
-        setTimeout(() => this._reconnect(), 3000);
+        const wait = this._backoffMs();
+        App.logStatus(`⚠️ ${opts.name} stream dropped — reconnecting in ${Math.round(wait / 1000)}s…`);
+        setTimeout(() => this._reconnect(), wait);
         return;
       }
+
       App.logStatus(`⚠️ سورة ${opts.tracks[this.idx]} could not play — skipping to the next one.`);
       this.play((this.idx + 1) % opts.tracks.length);
     },
@@ -288,7 +327,7 @@ function makeAudioPlayer(opts) {
         this._stalls = 0;
         if (!opts.tracks) { this._reconnect(); }
         else {
-          this.audio.src = opts.srcFor(this.idx);
+          this.audio.src = opts.srcFor(this.idx, this._srcTry);
           this.audio.currentTime = at;
           this.audio.play().catch(() => {});
           this._loadedAt = Date.now();
@@ -318,7 +357,14 @@ const Moalem = makeAudioPlayer({
   reciter: 'الشيخ محمود خليل الحصري',
   tracks: PODCAST.surahs,
   volumeKey: 'audio_settings.moalem_volume',
-  srcFor: (i) => `https://www.el-hosary.com/Elmoalem/${String(i + 1).padStart(3, '0')}.mp3`,
+  // Ordered source list. Only one host today; adding a mirror is one line
+  // here plus its host in the index.html `media-src` CSP directive, and the
+  // player will fall through to it automatically when a surah fails to load.
+  sources: ['https://www.el-hosary.com/Elmoalem'],
+  srcFor(i, tryIdx) {
+    const base = this.sources[(tryIdx || 0) % this.sources.length];
+    return `${base}/${String(i + 1).padStart(3, '0')}.mp3`;
+  },
   ids: {
     list: 'moalemList', play: 'moalemPlay', prev: 'moalemPrev', next: 'moalemNext',
     title: 'moalemTitle', sub: 'moalemSub', volume: 'moalemVolume',

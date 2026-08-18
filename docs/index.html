@@ -13,6 +13,8 @@
        No 'unsafe-inline'/'unsafe-eval' for scripts: the app has no inline
        scripts or event handlers, so script injection is fully blocked. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://api.aladhan.com https://api.bigdatacloud.net https://ipapi.co https://ipwho.is https://www.youtube.com; img-src 'self' data: https://i.ytimg.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; media-src 'self' https://www.el-hosary.com https://el-hosary.com https://radio.garden https://*.radiojar.com; worker-src blob:; child-src blob: https://www.youtube.com; object-src 'none'; base-uri 'self'; manifest-src 'self'; form-action 'none'" />
+  <!-- Audio now streams from third-party hosts; don't hand them the page URL. -->
+  <meta name="referrer" content="no-referrer" />
   <title>Athan Web — Prayer Times & Automatic Athan</title>
   <meta name="description" content="Automatic Islamic prayer times with athan, duaa and reminder audio — works anywhere in your browser." />
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml" />
@@ -278,7 +280,10 @@
           <p class="hint">🔒 Your coordinates (and, for auto-detect, your IP address) are sent only to the
             prayer-time and geocoding services that need them — Aladhan, BigDataCloud, ipapi and ipwho —
             to calculate your times. Nothing is stored on any server, and there is no tracking or analytics.
-            All your settings stay in this browser only.</p>
+            All your settings stay in this browser only. The athan, duaa and Azkar audio is served from this
+            site, but the two Quran tabs (المصحف المعلم and إذاعة القرآن) stream from el-hosary.com and the
+            station's servers — so those hosts can see your IP address while you listen. Opening those tabs
+            without pressing play sends them nothing.</p>
 
           <h4>Notifications</h4>
           <label><input type="checkbox" id="showNotifs" /> Show browser notifications</label>
