@@ -178,6 +178,8 @@ const Podcast = {
       App.logStatus('⚠️ Prayer audio is playing — the Quran will not interrupt it.');
       return;
     }
+    // Only one Quran player sounds at a time (this tab, المصحف المعلم, the radio).
+    if (typeof QuranPlayers !== 'undefined') QuranPlayers.silenceOthers('podcast');
     this._resumeWanted = false; // manual start supersedes any pending auto-resume
     this._shouldBePlaying = true;
     this._consecErrors = 0;

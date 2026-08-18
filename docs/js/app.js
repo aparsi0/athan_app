@@ -115,7 +115,8 @@ const App = {
 
     this.logStatus(`▶ ${event.label} — ${this.fmtTime(event.time)}`);
     this.notify(event.label);
-    Podcast.pause(); // prayer audio takes priority over the podcast
+    Podcast.pause();          // prayer audio takes priority over every Quran player
+    QuranPlayers.pauseAll();
 
     if (event.kind === 'athan') {
       const files = Config.get('audio_settings.athan_files', {});
@@ -129,6 +130,7 @@ const App = {
         await AudioManager.play(duaa.audio_file, duaa.volume, 'After-prayer Duaa');
       }
       Podcast.maybeResume(); // Quran continues where it was interrupted
+      QuranPlayers.resumeAll();
       this.renderSchedule();
       return;
     }
@@ -139,6 +141,7 @@ const App = {
       await AudioManager.play(cfg.audio_file, cfg.volume, event.label);
     }
     Podcast.maybeResume(); // Quran continues where it was interrupted
+    QuranPlayers.resumeAll();
     this.renderSchedule();
   },
 
@@ -279,6 +282,8 @@ const App = {
     document.getElementById('locateBtn').addEventListener('click', () => this.useMyLocation(false));
 
     Podcast.init();
+    Moalem.init();
+    QuranRadio.init();
 
     document.getElementById('testBtn').addEventListener('click', () => this.testNextAthan());
     this.updateTestButton();
@@ -286,6 +291,8 @@ const App = {
     document.getElementById('stopBtn').addEventListener('click', () => {
       AudioManager.stop();
       Podcast.cancelResume(); // user asked for silence — don't auto-resume the Quran
+      QuranPlayers.pauseAll();
+      QuranPlayers.cancelAll();
       this.logStatus('Playback stopped.');
     });
 
@@ -327,8 +334,9 @@ const App = {
     await AudioManager.unlock();
     AudioManager.startKeepAlive();
     Podcast.pause();
+    QuranPlayers.pauseAll();
     AudioManager.play(file, Config.get('audio_settings.athan_volume', 0.8), label)
-      .then(() => Podcast.maybeResume());
+      .then(() => { Podcast.maybeResume(); QuranPlayers.resumeAll(); });
   },
 
   updateTestButton() {

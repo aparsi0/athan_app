@@ -3,7 +3,7 @@
  * and caches audio files the first time they play.
  * Bump CACHE_VERSION when deploying changes to force clients to update.
  */
-const CACHE_VERSION = 'athan-web-v21';
+const CACHE_VERSION = 'athan-web-v22';
 const APP_SHELL = [
   '.',
   'index.html',
@@ -14,6 +14,7 @@ const APP_SHELL = [
   'js/audio.js',
   'js/scene.js',
   'js/podcast.js',
+  'js/audio-players.js',
   'js/scheduler.js',
   'js/app.js',
   'manifest.webmanifest',
