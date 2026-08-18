@@ -2,7 +2,7 @@
 
 > Compact reference: current features, full folder map, and a condensed changelog.
 > Read this first in any new session — it replaces re-deriving context from scratch.
-> Last updated: **2026-08-02**.
+> Last updated: **2026-08-18**.
 
 ---
 
@@ -24,7 +24,7 @@ git add -A && git commit -m "..." && git push
 ```
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v21**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v22**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -63,20 +63,21 @@ athan_app/
 │   └── candidates/                         theme-photo comparison pages
 │
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
-    ├── index.html             page shell: sound/location gate, 6 tabs, all panels   (254 lines)
+    ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (320 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v18                     (74 lines)
+    ├── sw.js                  service worker — cache version v22                     (75 lines)
     ├── README.md              web-app-specific readme
-    ├── css/style.css          full site styling, responsive, RTL Arabic support     (367 lines)
+    ├── css/style.css          full site styling, responsive, RTL Arabic support     (368 lines)
     ├── js/
     │   ├── config.js            defaults + localStorage persistence, Safari-safe helpers (165)
     │   ├── location.js          browser geolocation → reverse-geocode → IP fallback    (92)
     │   ├── prayer-times.js      Aladhan API client + per-day cache                      (88)
     │   ├── scheduler.js         builds/fires today's event list, midnight rollover     (157)
-    │   ├── audio.js             single reusable <audio> element, keep-alive loop        (127)
+    │   ├── audio.js             single reusable <audio> element, keep-alive loop        (177)
     │   ├── scene.js             ★ 20-frame living-sky engine (see §5)                  (410)
-    │   ├── podcast.js           Quran player: playlist, seek bar, resume logic          (269)
-    │   └── app.js               wires everything, UI rendering, settings, Test Athan    (399)
+    │   ├── podcast.js           Quran tab 1 — YouTube playlist, seek bar, resume logic  (365)
+    │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (350)
+    │   └── app.js               wires everything, UI rendering, settings, Test Athan    (410)
     └── assets/
         ├── audio/*.m4a           same 11 recordings as desktop (~63 MB)
         ├── icons/                 PWA icons (SVG + 180/192/512 PNG)
@@ -114,6 +115,22 @@ cross-fading through the visitor's real solar day; sun/moon painted directly int
 - **Athan priority**: pauses automatically when prayer audio starts, **auto-resumes** once the full
   chain (athan + duaa) finishes; pressing Stop cancels the pending resume.
 - **Loops forever**: An-Nas → back to Al-Fatiha.
+
+**Two more Quran tabs** (`audio-players.js`, added 2026-08-18) — both plain HTML5 `<audio>`,
+no iframe, so no visible player is required:
+- **المصحف المعلم** — Sheikh Mahmoud Khalil Al-Hosary's teaching mushaf, all 114 surahs in order,
+  streamed as direct MP3s from `https://www.el-hosary.com/Elmoalem/001.mp3` … `114.mp3`
+  (zero-padded 3 digits). Full seek bar, auto-advance, loops An-Nas → Al-Fatiha.
+- **إذاعة القرآن الكريم من القاهرة** — the live 98.2 FM Cairo station (the Radio Garden
+  `GQxvGBNK` channel). Live, so no seek bar: after an athan it **rejoins at the live edge**
+  rather than resuming. Falls through a list of stream addresses if one is unreachable:
+  `n12` / `n0b` / `stream.radiojar.com/8s5u5tpdtwzuv`, then the
+  `radio.garden/api/ara/content/listen/GQxvGBNK/channel.mp3` resolver.
+- Both share one `makeAudioPlayer` engine plus a **`QuranPlayers` registry**: only one Quran
+  source can sound at a time across all three tabs — starting one silences the others.
+- Each has its **own persisted volume** (`audio_settings.moalem_volume`, `…radio_volume`) and its
+  own stall watchdog, same shape as the YouTube player's. Athan priority is unchanged: every
+  player pauses when prayer audio starts and resumes (or rejoins) after the full chain finishes.
 
 **Reliability (background/minimized tabs)**
 - Web Worker clock (exempt from background-tab timer throttling)
@@ -177,6 +194,11 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
   and checking where the sun/moon actually sits, rather than trusting index labels — the anchors
   now match the art exactly.
 - Personal `*.HEIC` photo and any `*.zip` deliverables are gitignored — never pushed to the public repo.
+- **CSP and redirecting streams**: `media-src` must list `https://*.radiojar.com` as a wildcard,
+  not individual hosts. The Radio Garden resolver 302-redirects to whichever Radiojar edge is
+  healthy (`n12`, `n0b`, `n0e`…), and CSP validates the *redirect target* — pinning single hosts
+  silently blocked the radio. Adding any new audio source means adding its host to `media-src`
+  in `docs/index.html`.
 
 ---
 
@@ -216,6 +238,12 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     stacking. CSP allows only what's needed: YouTube player, four API origins, blob: Web Worker.
 14. **Inaudible keep-alive verified**: confirmed the background audio loop that keeps tabs alive
     during prayer times (original feature from earlier, still active and working).
+15. **Two new Quran tabs (2026-08-18)**: المصحف المعلم (Al-Hosary, 114 direct MP3s from
+    el-hosary.com) and إذاعة القرآن الكريم من القاهرة (live 98.2 stream). Added
+    `docs/js/audio-players.js` with a shared `<audio>` engine and a one-at-a-time `QuranPlayers`
+    registry; extended CSP `media-src` to el-hosary.com, radio.garden and `*.radiojar.com`.
+    First attempt looked broken because CSP blocked the radio's redirect target — fixed with the
+    wildcard, then all sources verified loading under the live policy. Bumped sw.js to v22.
 
 ## 8. Possible future ideas (not requested yet)
 
@@ -223,3 +251,8 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
 - Custom domain (GitHub Pages supports CNAME)
 - Re-enable GitHub Actions deploy (needs `gh auth refresh -s workflow`)
 - Monthly prayer-times table view, more languages, in-UI offset controls for Al-Kahf/Azkar timing
+- **More reciters**: additional full-mushaf sheikhs with a reciter selector, remembered per
+  visitor. el-hosary.com already hosts several more mushafs in the same URL shape
+  (المجود، المفسر، حفص الإذاعة المصرية، ورش، قالون) — cheapest next source.
+- **Morning auto-play**: a chosen Quran source playing automatically between sunrise and the
+  morning Azkar, toggleable in Settings.

@@ -12,7 +12,7 @@
          style inline  → the handful of inline style attributes in this file
        No 'unsafe-inline'/'unsafe-eval' for scripts: the app has no inline
        scripts or event handlers, so script injection is fully blocked. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://api.aladhan.com https://api.bigdatacloud.net https://ipapi.co https://ipwho.is https://www.youtube.com; img-src 'self' data: https://i.ytimg.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; media-src 'self'; worker-src blob:; child-src blob: https://www.youtube.com; object-src 'none'; base-uri 'self'; manifest-src 'self'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://api.aladhan.com https://api.bigdatacloud.net https://ipapi.co https://ipwho.is https://www.youtube.com; img-src 'self' data: https://i.ytimg.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; media-src 'self' https://www.el-hosary.com https://el-hosary.com https://radio.garden https://*.radiojar.com; worker-src blob:; child-src blob: https://www.youtube.com; object-src 'none'; base-uri 'self'; manifest-src 'self'; form-action 'none'" />
   <title>Athan Web — Prayer Times & Automatic Athan</title>
   <meta name="description" content="Automatic Islamic prayer times with athan, duaa and reminder audio — works anywhere in your browser." />
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml" />
@@ -53,6 +53,8 @@
       <button data-tab="athan" class="active">Athan</button>
       <button data-tab="schedule">Schedule</button>
       <button data-tab="quran">Quran</button>
+      <button data-tab="moalem" lang="ar">المصحف المعلم</button>
+      <button data-tab="radio" lang="ar">إذاعة القرآن</button>
       <button data-tab="install">Install</button>
       <button data-tab="activity">Activity</button>
       <button data-tab="settings">Settings</button>
@@ -127,6 +129,55 @@
           from the <a href="https://www.youtube.com/playlist?list=PL8475A8813886C6A5" target="_blank" rel="noopener">YouTube playlist</a>.
           YouTube's rules require its player to stay visible, so it lives as a small corner thumbnail — tap it to enlarge.
           The athan always takes priority: the Quran pauses automatically when prayer audio starts.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-moalem">
+      <div class="card">
+        <h3>Al-Mos'ahaf Al-Moa'alem — المصحف المعلم · الشيخ محمود خليل الحصري</h3>
+        <div class="player-bar">
+          <button class="pbtn small" id="moalemPrev" title="Previous surah">⏮</button>
+          <button class="pbtn" id="moalemPlay" title="Play / pause">▶</button>
+          <button class="pbtn small" id="moalemNext" title="Next surah">⏭</button>
+          <div class="player-info">
+            <div class="pi-title" id="moalemTitle">اختر سورة من القائمة</div>
+            <div class="pi-sub" id="moalemSub">Audio player — full recordings, auto-advance</div>
+          </div>
+          <div class="qvol" title="Volume for this player (separate from the athan)">
+            🔊 <input type="range" id="moalemVolume" min="0" max="1" step="0.05" />
+          </div>
+        </div>
+        <div class="player-progress">
+          <span class="ptime" id="moalemCurrent">0:00</span>
+          <input type="range" class="seek" id="moalemSeek" min="0" max="0" step="1" value="0" disabled title="Seek within this surah" />
+          <span class="ptime" id="moalemDuration">0:00</span>
+        </div>
+        <ol class="surah-list" id="moalemList"></ol>
+        <p class="hint">All 114 surahs in Quran order, played as audio directly from
+          <a href="https://el-hosary.com/el-moalem/" target="_blank" rel="noopener">el-hosary.com</a>.
+          The athan always takes priority: playback pauses automatically when prayer audio starts,
+          and starting a player here stops the other Quran tabs.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-radio">
+      <div class="card">
+        <h3>إذاعة القرآن الكريم من القاهرة — Quran Radio Cairo 98.2</h3>
+        <div class="player-bar">
+          <button class="pbtn" id="radioPlay" title="Play / pause the live stream">▶</button>
+          <div class="player-info">
+            <div class="pi-title" id="radioTitle">البث المباشر · 98.2 FM</div>
+            <div class="pi-sub" id="radioSub">Live 24/7 — recitations and religious programmes</div>
+          </div>
+          <div class="qvol" title="Volume for this player (separate from the athan)">
+            🔊 <input type="range" id="radioVolume" min="0" max="1" step="0.05" />
+          </div>
+        </div>
+        <p class="hint">Live stream of the Cairo station, as listed on
+          <a href="https://radio.garden/listen/quran-fm-98-2-idhaet-alqran-alkrym/GQxvGBNK" target="_blank" rel="noopener">Radio Garden</a>.
+          Being live, there is nothing to seek: the athan pauses it and it rejoins the broadcast
+          at the live edge afterwards. If the station is unreachable the player retries other stream
+          addresses automatically.</p>
       </div>
     </section>
 
@@ -262,6 +313,7 @@
   <script src="js/audio.js"></script>
   <script src="js/scene.js"></script>
   <script src="js/podcast.js"></script>
+  <script src="js/audio-players.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/app.js"></script>
 </body>

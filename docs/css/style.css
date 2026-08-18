@@ -72,6 +72,7 @@ nav.tabs button {
 nav.tabs button:first-child { border-radius: 6px 0 0 6px; }
 nav.tabs button:last-child { border-radius: 0 6px 6px 0; }
 nav.tabs button:hover { background: rgba(212,175,55,0.3); }
+nav.tabs button[lang="ar"] { letter-spacing: 0; text-transform: none; font-size: 13px; }
 nav.tabs button.active { background: rgba(212,175,55,0.9); color: #141002; font-weight: 700; border-color: var(--gold); }
 
 /* ============ PANELS & CARDS ============ */
