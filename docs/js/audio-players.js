@@ -156,15 +156,20 @@ function makeAudioPlayer(opts) {
       this._loadedAt = Date.now();
 
       if (opts.tracks) {
+        // An index from a previous session can be out of range after the
+        // reciter changed (114-surah list -> a 31-surah one). Clamp rather
+        // than let srcFor fall back to surah 1 while the UI claims otherwise.
+        if (!Number.isInteger(i) || i < 0 || i >= opts.tracks.length) i = 0;
         this.idx = i;
         opts.onTrackChange?.(i);
         this.audio.src = opts.srcFor(i, this._srcTry);
         document.getElementById(opts.ids.title).textContent = `سورة ${opts.tracks[i]}`;
-        document.getElementById(opts.ids.sub).textContent = `${i + 1} / ${opts.tracks.length} · ${opts.reciter}`;
+        document.getElementById(opts.ids.sub).textContent =
+          `سورة ${this._trackNo(i)} · ${i + 1} / ${opts.tracks.length} · ${opts.reciter}`;
         document.querySelectorAll(`#${opts.ids.list} li`).forEach((li) =>
           li.classList.toggle('playing', Number(li.dataset.i) === i));
         this._resetSeek();
-        App.logStatus(`${opts.icon} ${opts.name} — سورة ${opts.tracks[i]} (${i + 1}/${opts.tracks.length})`);
+        App.logStatus(`${opts.icon} ${opts.name} — سورة ${opts.tracks[i]} (${i + 1}/${opts.tracks.length})`.trim());
       } else {
         this.idx = 0;
         this.audio.src = opts.srcFor(0, this._srcTry);
@@ -327,10 +332,19 @@ function makeAudioPlayer(opts) {
       opts.tracks.forEach((name, i) => {
         const li = document.createElement('li');
         li.dataset.i = i;
-        li.innerHTML = `<span class="snum">${i + 1}</span><span class="sname">سورة ${name}</span>`;
+        // The number shown must be the SURAH's number, not its position in
+        // this list. They diverge for a partial mushaf: محمد رفعت's second
+        // entry is سورة يونس, which is surah 10, not 2.
+        li.innerHTML = `<span class="snum">${this._trackNo(i)}</span><span class="sname">سورة ${name}</span>`;
         li.addEventListener('click', () => this.play(i, true));
         ol.appendChild(li);
       });
+    },
+
+    /** Real surah number for list position i (defaults to i+1). */
+    _trackNo(i) {
+      const nums = typeof opts.trackNumbers === 'function' ? opts.trackNumbers() : null;
+      return nums && nums[i] != null ? nums[i] : i + 1;
     },
 
     /** Swap the whole track list (a different reciter, a different mushaf).

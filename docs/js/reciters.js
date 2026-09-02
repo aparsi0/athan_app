@@ -88,9 +88,11 @@ const Reciters = {
       tracks: this.trackNames(),
       volumeKey: 'audio_settings.quran_volume',
       srcFor: (i) => Reciters.srcFor(i),
+      trackNumbers: () => reciterSurahs(Reciters.active()),
       onPlaylistEnd: () => Reciters.advanceReciter(),
-      // Remember the position so a reload mid-morning resumes the same surah.
-      onTrackChange: (i) => Config.set('audio_settings.morning_quran_index', i),
+      // Last surah played on this device, at any hour. The morning window
+      // resumes from it; it is not morning-specific.
+      onTrackChange: (i) => Config.set('audio_settings.quran_last_index', i),
       ids: {
         list: 'surahList', play: 'playBtn', prev: 'prevBtn', next: 'nextBtn',
         title: 'piTitle', sub: 'piSub', volume: 'quranVolume',
@@ -127,14 +129,20 @@ const Reciters = {
     if (sel) sel.value = String(this.current);
   },
 
-  /** Switch reciter. autoplay starts surah 0 immediately (a real click). */
+  /** Switch reciter. autoplay starts surah 0 immediately (a real click).
+   *  Selecting the reciter that is ALREADY current is a no-op — it must not
+   *  reset the saved position, or resuming mid-morning is impossible. */
   select(i, autoplay) {
     const next = ((i % RECITERS.length) + RECITERS.length) % RECITERS.length;
-    if (next === this.current && this.player.idx != null && !autoplay) return;
+    if (next === this.current) {
+      if (autoplay) this.player.play(0, true);
+      return;
+    }
     this.current = next;
     Config.set('audio_settings.reciter_id', this.active().id);
     this._syncSelect();
-    Config.set('audio_settings.morning_quran_index', 0);
+    // A position is only meaningful within one reciter's list.
+    Config.set('audio_settings.quran_last_index', 0);
     this.player.setTracks(this.trackNames());
     this.renderHeader();
     if (autoplay) this.player.play(0, true);
@@ -145,6 +153,7 @@ const Reciters = {
     const finished = this.active().sheikh;
     this.current = (this.current + 1) % RECITERS.length;
     Config.set('audio_settings.reciter_id', this.active().id);
+    Config.set('audio_settings.quran_last_index', 0);
     this._syncSelect();
     this.player.setTracks(this.trackNames());
     this.renderHeader();
