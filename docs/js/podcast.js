@@ -244,19 +244,21 @@ const Podcast = {
           onReady: () => {
             this.ready = true;
             this._applyVolume();
-            if (this._pendingIdx != null) {
-              const pending = this._pendingIdx;
-              this._pendingIdx = null;
-              // The iframe can take seconds to come up. If an athan started in
-              // the meantime, do not autoplay over it — remember to resume.
-              if (this._suppressPending || AudioManager.isPlaying()) {
-                this._suppressPending = false;
-                this._resumeWanted = true;
-                try { this.player.pauseVideo(); } catch { /* not up yet */ }
-              } else {
-                this.player.loadVideoById(PODCAST.videoIds[pending]);
-              }
+            const pending = this._pendingIdx;
+            this._pendingIdx = null;
+            // The iframe takes seconds to come up and is constructed with
+            // autoplay:1, so it WILL start on its own. This check must sit
+            // outside any `pending != null` test: cancelResume() (the Stop
+            // button, and QuranPlayers.silenceOthers) clears _pendingIdx, and
+            // nesting the check inside it made this guard dead code on exactly
+            // those paths — the Quran started after the user pressed Stop.
+            if (this._suppressPending || AudioManager.isPlaying()) {
+              this._suppressPending = false;
+              if (pending != null) this._resumeWanted = true;
+              try { this.player.pauseVideo(); } catch { /* not up yet */ }
+              return;
             }
+            if (pending != null) this.player.loadVideoById(PODCAST.videoIds[pending]);
           },
           onStateChange: (e) => {
             this.playing = e.data === YT.PlayerState.PLAYING;
