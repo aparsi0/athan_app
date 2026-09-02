@@ -347,6 +347,29 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     محمد رفعت album is **verse-range excerpts** ("من 25 - 29 سورة البقرة"), not surahs, so
     an ordered الفاتحة→الناس sequence was never possible from it.
 
+23. **Morning-window hardening (2026-09-02).** An adversarial review of item 20 found five
+    real defects, all fixed the same day. Worth remembering as a class, because four of them
+    share one root cause — *reading player state that is set asynchronously*:
+    - The stop handler guarded on `playing`/`_shouldBePlaying`, both of which are false when
+      something else has already paused the player, while `_resumeWanted` is still true. The
+      stop was skipped and the next `resumeAll()` restarted the Quran after its window closed.
+      **Stopping must be unconditional.** Reachable with UI-legal values: a 240-minute offset
+      puts the window end exactly on Dhuhr.
+    - `build()` rewrites `events` without rewinding `lastTick`, so any rebuild that places an
+      event in the past means it can never fire. Disabling the feature mid-window therefore did
+      not stop it. **Anything with a lifecycle needs a re-evaluation hook on rebuild**, not just
+      a scheduled end event — hence `Scheduler.onRefresh` driving start/stop.
+    - The "already running" guard tested `playing`, which is only set by the audio element's
+      own event and cannot have fired by the next synchronous statement. Use
+      `_shouldBePlaying`, which is set synchronously.
+    - A fixed `setTimeout` after init raced geolocation (8s+) plus reverse-geocoding (6s) plus
+      the Aladhan fetch (10s), and usually lost with no retry.
+    - `select()` cleared the saved position before `startMorningQuran` read it, so the
+      advertised resume had never once worked.
+    Plus one data bug: رفعت's list rendered `i + 1`, showing "2" beside سورة يونس (surah 10).
+    Invisible for full mushafs where position + 1 *is* the surah number — which is exactly why
+    a happy-path harness could not catch it. **A partial mushaf must render real surah numbers.**
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind)
