@@ -311,6 +311,10 @@ const App = {
 
     document.getElementById('stopBtn').addEventListener('click', () => {
       AudioManager.stop();
+      // Stop the YouTube player explicitly. It is deliberately NOT in the
+      // QuranPlayers registry (silenceOthers drives it by name), so
+      // pauseAll() below does not reach it.
+      Podcast.pause();
       Podcast.cancelResume(); // user asked for silence — don't auto-resume the Quran
       QuranPlayers.pauseAll();
       QuranPlayers.cancelAll();
