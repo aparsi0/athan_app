@@ -11,7 +11,14 @@ const App = {
     this.logStatus('Starting Athan Web…');
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      // Do NOT swallow this error. A CSP that omits 'self' from worker-src
+      // blocks sw.js with a SecurityError, which silently disables offline
+      // support and PWA install — that went unnoticed for months because the
+      // failure was caught and discarded here.
+      navigator.serviceWorker.register('sw.js').catch((e) => {
+        console.warn('[app] service worker registration failed:', e);
+        this.logStatus('⚠️ Offline support unavailable: ' + (e?.message || e));
+      });
     }
 
     AudioManager.onStateChange = (label) => this.renderNowPlaying(label);
