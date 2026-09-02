@@ -28,17 +28,24 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 
 PALETTE = {
-    "bg": "#0f2b1d",
-    "panel": "#173826",
-    "card": "#f5f1e8",
-    "card_alt": "#e0f0d8",
-    "text_dark": "#173826",
-    "text_light": "#f8f5ef",
-    "muted": "#7b8f83",
-    "accent": "#c8a34d",
-    "accent_soft": "#f3d995",
-    "good": "#2e7d32",
-    "warn": "#a8551a",
+    # Night-sky palette, matching the web app. Dark cards on a dark ground
+    # rather than cream panels on green: one continuous surface, with gold as
+    # the single accent so nothing competes with the prayer times themselves.
+    # NOTE: "text_dark" is a legacy name — it is the text drawn ON cards, which
+    # are now dark, so it is a LIGHT colour. Text drawn on the gold accent uses
+    # "on_accent".
+    "bg": "#0b1420",
+    "panel": "#101d2c",
+    "card": "#16273a",
+    "card_alt": "#1d3550",
+    "text_dark": "#eaf1f8",
+    "text_light": "#f2f7fb",
+    "muted": "#8ca0b4",
+    "accent": "#e3bd63",
+    "accent_soft": "#f0d494",
+    "good": "#7ddba0",
+    "warn": "#e6b165",
+    "on_accent": "#1c1503",
 }
 
 
@@ -115,7 +122,7 @@ def _card(parent: tk.Widget, title: str, subtitle: str = "", highlight: bool = F
         text=title,
         bg=frame["bg"],
         fg=PALETTE["text_dark"],
-        font=("Helvetica", 16, "bold"),
+        font=("SF Pro Display", 15, "bold"),
         anchor="w",
     ).pack(anchor="w")
 
@@ -125,7 +132,7 @@ def _card(parent: tk.Widget, title: str, subtitle: str = "", highlight: bool = F
             text=subtitle,
             bg=frame["bg"],
             fg=PALETTE["muted"],
-            font=("Helvetica", 11),
+            font=("SF Pro Text", 11),
             justify="left",
             anchor="w",
         ).pack(anchor="w", pady=(6, 0))
@@ -139,7 +146,7 @@ def _section_title(parent: tk.Widget, text: str):
         text=text,
         bg=PALETTE["bg"],
         fg=PALETTE["accent_soft"],
-        font=("Helvetica", 13, "bold"),
+        font=("SF Pro Text", 12, "bold"),
         anchor="w",
     ).pack(anchor="w", padx=18, pady=(18, 6))
 
@@ -164,7 +171,7 @@ def _show_simple_payload(payload: dict):
         text=payload.get("title", "Athan App"),
         bg=PALETTE["panel"],
         fg=PALETTE["text_light"],
-        font=("Helvetica", 22, "bold"),
+        font=("SF Pro Display", 21, "bold"),
         anchor="w",
     ).pack(anchor="w")
 
@@ -175,7 +182,7 @@ def _show_simple_payload(payload: dict):
             text=subtitle,
             bg=PALETTE["panel"],
             fg="#cfe2d7",
-            font=("Helvetica", 11),
+            font=("SF Pro Text", 11),
             justify="left",
             anchor="w",
         ).pack(anchor="w", pady=(6, 0))
@@ -218,11 +225,11 @@ def _show_simple_payload(payload: dict):
         text="Close",
         command=root.destroy,
         bg=PALETTE["accent"],
-        fg=PALETTE["text_dark"],
+        fg=PALETTE["on_accent"],
         activebackground=PALETTE["accent_soft"],
-        activeforeground=PALETTE["text_dark"],
+        activeforeground=PALETTE["on_accent"],
         relief="flat",
-        font=("Helvetica", 12, "bold"),
+        font=("SF Pro Text", 12, "bold"),
         padx=18,
         pady=8,
         cursor="hand2",
@@ -278,7 +285,7 @@ class DashboardWindow:
             text=self.payload.get("title", "Athan App"),
             bg=PALETTE["panel"],
             fg=PALETTE["text_light"],
-            font=("Helvetica", 20, "bold"),
+            font=("SF Pro Display", 19, "bold"),
             anchor="w",
         ).pack(anchor="w")
 
@@ -287,7 +294,7 @@ class DashboardWindow:
             text=self.payload.get("subtitle", ""),
             bg=PALETTE["panel"],
             fg="#cfe2d7",
-            font=("Helvetica", 10),
+            font=("SF Pro Text", 10),
             anchor="w",
         ).pack(anchor="w", pady=(4, 0))
 
@@ -308,13 +315,14 @@ class DashboardWindow:
             "Athan.TNotebook.Tab",
             background=PALETTE["panel"],
             foreground=PALETTE["text_light"],
-            padding=(16, 8),
-            font=("Helvetica", 11, "bold"),
+            padding=(18, 10),
+            borderwidth=0,
+            font=("SF Pro Text", 11),
         )
         style.map(
             "Athan.TNotebook.Tab",
             background=[("selected", PALETTE["accent"])],
-            foreground=[("selected", PALETTE["text_dark"])],
+            foreground=[("selected", PALETTE["on_accent"])],
         )
 
         self.notebook = ttk.Notebook(self.root, style="Athan.TNotebook")
@@ -362,7 +370,7 @@ class DashboardWindow:
             text="Next Prayer",
             bg=PALETTE["card_alt"],
             fg=PALETTE["muted"],
-            font=("Helvetica", 11, "bold"),
+            font=("SF Pro Text", 11, "bold"),
             anchor="w",
         ).pack(anchor="w")
 
@@ -371,7 +379,7 @@ class DashboardWindow:
             text="—",
             bg=PALETTE["card_alt"],
             fg=PALETTE["text_dark"],
-            font=("Helvetica", 24, "bold"),
+            font=("SF Pro Display", 26, "bold"),
             anchor="w",
         )
         self.next_prayer_label.pack(anchor="w", pady=(2, 4))
@@ -381,7 +389,7 @@ class DashboardWindow:
             text="",
             bg=PALETTE["card_alt"],
             fg=PALETTE["good"],
-            font=("Helvetica", 14),
+            font=("SF Pro Text", 13),
             anchor="w",
         )
         self.countdown_label.pack(anchor="w")
@@ -391,7 +399,7 @@ class DashboardWindow:
             text="",
             bg=PALETTE["card_alt"],
             fg=PALETTE["muted"],
-            font=("Helvetica", 10),
+            font=("SF Pro Text", 10),
             anchor="w",
         )
         self.clock_label.pack(anchor="w", pady=(6, 0))
@@ -402,7 +410,7 @@ class DashboardWindow:
             text="  Today's schedule  ",
             bg=PALETTE["bg"],
             fg=PALETTE["accent_soft"],
-            font=("Helvetica", 11, "bold"),
+            font=("SF Pro Text", 11, "bold"),
             bd=0,
         )
         sched_frame.pack(fill="both", expand=True)
@@ -433,34 +441,45 @@ class DashboardWindow:
         # Each entry: (countdown_label, target_datetime, note_text)
         self._row_countdowns = []
 
-        rows = []  # tuples of (label, time_str, note, highlight)
-
-        next_name = self.next_prayer.get("prayer") if self.next_prayer else None
+        # (label, time_str, base_note, prayer_key). "Up next" is NOT baked in
+        # here: it used to come from the payload's next_prayer, which is frozen
+        # at the moment the window opened, while the header recomputed it live.
+        # The two disagreed, and a row could show a stale "Up next" beside a
+        # live "passed". _tick now owns that marker for both.
+        rows = []
 
         for prayer in self.PRAYER_NAMES:
             time_str = self.prayer_times.get(prayer)
             if not time_str:
                 continue
-            note_parts = []
             reminder = self.reminder_schedule.get(f"pre_prayer_woduaa:{prayer}")
-            if reminder:
-                note_parts.append(f"Woduaa at {reminder}")
-            if prayer == next_name:
-                note_parts.insert(0, "Up next")
             rows.append((
                 self._EVENT_LABELS.get(prayer, prayer.title()),
                 time_str,
-                "  ·  ".join(note_parts),
-                prayer == next_name,
+                f"Woduaa at {reminder}" if reminder else "",
+                prayer,
             ))
 
         sunrise = self.prayer_times.get("sunrise")
         if sunrise:
-            rows.append((self._EVENT_LABELS["sunrise"], sunrise, "", False))
+            rows.append((self._EVENT_LABELS["sunrise"], sunrise, "", None))
 
         for event_name, time_str in self.custom_audio_schedule.items():
             label = self._EVENT_LABELS.get(event_name, event_name.replace("_", " ").title())
-            rows.append((label, time_str, "", False))
+            rows.append((label, time_str, "", None))
+
+        # ---------- BUG: chronological order ----------
+        # Rows were emitted in construction order — the five prayers, then
+        # sunrise, then the custom audio events. So Sunrise (06:47) rendered
+        # AFTER Isha (20:52), and the reminders after that. Sort by clock time
+        # so the day reads top to bottom.
+        def _sort_key(row):
+            try:
+                hh, mm = (int(x) for x in row[1].split(":")[:2])
+                return hh * 60 + mm
+            except (ValueError, AttributeError):
+                return 24 * 60 + 1        # unparseable times sink to the bottom
+        rows.sort(key=_sort_key)
 
         if not rows:
             tk.Label(
@@ -468,12 +487,15 @@ class DashboardWindow:
                 text="No prayer schedule loaded yet.",
                 bg=PALETTE["bg"],
                 fg=PALETTE["muted"],
-                font=("Helvetica", 11),
+                font=("SF Pro Text", 11),
             ).pack(pady=20)
             return
 
         now = datetime.now()
-        for label, time_str, note, highlight in rows:
+        live_next = self._compute_next_prayer(now)
+        live_next_name = live_next[0] if live_next else None
+        for label, time_str, note, prayer_key in rows:
+            highlight = prayer_key is not None and prayer_key == live_next_name
             row = tk.Frame(
                 self.schedule_rows_frame,
                 bg=PALETTE["card_alt"] if highlight else PALETTE["card"],
@@ -487,7 +509,7 @@ class DashboardWindow:
                 text=label,
                 bg=row["bg"],
                 fg=PALETTE["text_dark"],
-                font=("Helvetica", 13, "bold"),
+                font=("SF Pro Text", 12, "bold"),
                 width=26,
                 anchor="w",
             ).pack(side="left")
@@ -497,7 +519,7 @@ class DashboardWindow:
                 text=time_str,
                 bg=row["bg"],
                 fg=PALETTE["text_dark"],
-                font=("Helvetica", 13),
+                font=("SF Pro Text", 13),
                 width=8,
                 anchor="w",
             ).pack(side="left")
@@ -507,21 +529,26 @@ class DashboardWindow:
                 text="",
                 bg=row["bg"],
                 fg=PALETTE["good"],
-                font=("Helvetica", 11, "bold"),
+                font=("SF Pro Text", 11, "bold"),
             )
             countdown_label.pack(side="right")
 
-            if note:
-                tk.Label(
-                    row,
-                    text=note,
-                    bg=row["bg"],
-                    fg=PALETTE["muted"],
-                    font=("Helvetica", 10),
-                ).pack(side="right", padx=(0, 12))
+            note_label = tk.Label(
+                row,
+                text=self._row_note(note, highlight),
+                bg=row["bg"],
+                fg=PALETTE["muted"],
+                font=("SF Pro Text", 10),
+            )
+            note_label.pack(side="right", padx=(0, 12))
 
             target_dt = self._parse_today_time(time_str, now)
-            self._row_countdowns.append((countdown_label, target_dt))
+            self._row_countdowns.append((countdown_label, target_dt, note_label, note, prayer_key))
+
+    @staticmethod
+    def _row_note(base_note: str, is_next: bool) -> str:
+        parts = (["Up next"] if is_next else []) + ([base_note] if base_note else [])
+        return "  ·  ".join(parts)
 
     def _tick(self):
         """Update the top countdown card and every per-row countdown."""
@@ -540,8 +567,13 @@ class DashboardWindow:
             self.next_prayer_label.config(text="No upcoming prayer today")
             self.countdown_label.config(text="Refreshing at midnight")
 
-        # Update each row's countdown.
-        for label_widget, target_dt in getattr(self, "_row_countdowns", []):
+        # Update each row's countdown, and its "Up next" marker from the SAME
+        # live computation the header above uses, so the two can never disagree.
+        live_next_name = next_info[0] if next_info else None
+        for label_widget, target_dt, note_label, base_note, prayer_key in getattr(self, "_row_countdowns", []):
+            is_next = prayer_key is not None and prayer_key == live_next_name
+            if note_label is not None:
+                note_label.config(text=self._row_note(base_note, is_next))
             if target_dt is None:
                 label_widget.config(text="", fg=PALETTE["muted"])
                 continue
@@ -621,7 +653,7 @@ class DashboardWindow:
             activebackground=PALETTE["card"],
             selectcolor=PALETTE["card_alt"],
             anchor="w",
-            font=("Helvetica", 11),
+            font=("SF Pro Text", 11),
         ).pack(anchor="w", pady=(0, 8))
 
         for key, label in [
@@ -654,7 +686,7 @@ class DashboardWindow:
             text="Calculation method",
             bg=PALETTE["card"],
             fg=PALETTE["text_dark"],
-            font=("Helvetica", 11),
+            font=("SF Pro Text", 11),
             width=22,
             anchor="w",
         ).pack(side="left")
@@ -671,7 +703,7 @@ class DashboardWindow:
             text="Enabled prayers",
             bg=PALETTE["card"],
             fg=PALETTE["text_dark"],
-            font=("Helvetica", 11, "bold"),
+            font=("SF Pro Text", 11, "bold"),
         ).pack(anchor="w", pady=(12, 4))
 
         enabled = prayer_settings.get("enabled_prayers", {})
@@ -688,7 +720,7 @@ class DashboardWindow:
                 fg=PALETTE["text_dark"],
                 activebackground=PALETTE["card"],
                 selectcolor=PALETTE["card_alt"],
-                font=("Helvetica", 11),
+                font=("SF Pro Text", 11),
             ).pack(side="left", padx=4)
 
     def _build_audio_volume_section(self, parent: tk.Frame):
@@ -773,7 +805,7 @@ class DashboardWindow:
             fg=PALETTE["text_dark"],
             activebackground=PALETTE["card_alt"],
             selectcolor=PALETTE["card"],
-            font=("Helvetica", 12, "bold"),
+            font=("SF Pro Text", 12, "bold"),
         ).pack(side="left")
 
         if offset_field:
@@ -785,7 +817,7 @@ class DashboardWindow:
                 text=field_label,
                 bg=PALETTE["card_alt"],
                 fg=PALETTE["text_dark"],
-                font=("Helvetica", 10),
+                font=("SF Pro Text", 10),
                 width=30,
                 anchor="w",
             ).pack(side="left")
@@ -801,7 +833,7 @@ class DashboardWindow:
             text="Volume (0.0–1.0)",
             bg=PALETTE["card_alt"],
             fg=PALETTE["text_dark"],
-            font=("Helvetica", 10),
+            font=("SF Pro Text", 10),
             width=30,
             anchor="w",
         ).pack(side="left")
@@ -816,7 +848,7 @@ class DashboardWindow:
             text="Audio file",
             bg=PALETTE["card_alt"],
             fg=PALETTE["text_dark"],
-            font=("Helvetica", 10),
+            font=("SF Pro Text", 10),
             width=30,
             anchor="w",
         ).pack(side="left")
@@ -828,7 +860,7 @@ class DashboardWindow:
             text="Browse…",
             command=lambda v=file_var: self._browse_audio(v),
             bg=PALETTE["accent"],
-            fg=PALETTE["text_dark"],
+            fg=PALETTE["on_accent"],
             activebackground=PALETTE["accent_soft"],
             relief="flat",
             cursor="hand2",
@@ -927,7 +959,7 @@ class DashboardWindow:
             text=label,
             bg=PALETTE["card"],
             fg=PALETTE["text_dark"],
-            font=("Helvetica", 11),
+            font=("SF Pro Text", 11),
             width=22,
             anchor="w",
         ).pack(side="left")
@@ -941,7 +973,7 @@ class DashboardWindow:
             text=title,
             bg=PALETTE["bg"],
             fg=PALETTE["accent_soft"],
-            font=("Helvetica", 13, "bold"),
+            font=("SF Pro Text", 12, "bold"),
             anchor="w",
         ).pack(anchor="w", padx=14, pady=(14, 4))
 
@@ -958,7 +990,7 @@ class DashboardWindow:
             text="",
             bg=PALETTE["bg"],
             fg=PALETTE["good"],
-            font=("Helvetica", 10),
+            font=("SF Pro Text", 10),
         )
         self.settings_status_label.pack(side="left")
 
@@ -967,11 +999,11 @@ class DashboardWindow:
             text="Save changes",
             command=self._save_settings,
             bg=PALETTE["accent"],
-            fg=PALETTE["text_dark"],
+            fg=PALETTE["on_accent"],
             activebackground=PALETTE["accent_soft"],
-            activeforeground=PALETTE["text_dark"],
+            activeforeground=PALETTE["on_accent"],
             relief="flat",
-            font=("Helvetica", 11, "bold"),
+            font=("SF Pro Text", 11, "bold"),
             padx=18,
             pady=8,
             cursor="hand2",
@@ -1103,7 +1135,7 @@ class DashboardWindow:
                 text="No audio files are currently loaded.",
                 bg=PALETTE["bg"],
                 fg=PALETTE["muted"],
-                font=("Helvetica", 11),
+                font=("SF Pro Text", 11),
             ).pack(pady=20)
             return
 
@@ -1115,7 +1147,7 @@ class DashboardWindow:
                 text=label,
                 bg=PALETTE["card"],
                 fg=PALETTE["text_dark"],
-                font=("Helvetica", 12, "bold"),
+                font=("SF Pro Text", 12, "bold"),
                 width=24,
                 anchor="w",
             ).pack(side="left")
@@ -1124,7 +1156,7 @@ class DashboardWindow:
                 text=os.path.basename(path) if path else "—",
                 bg=PALETTE["card"],
                 fg=PALETTE["text_dark"],
-                font=("Helvetica", 11),
+                font=("SF Pro Text", 11),
                 anchor="w",
             ).pack(side="left", padx=(8, 8))
             tk.Label(
@@ -1146,7 +1178,7 @@ class DashboardWindow:
             text="Athan App",
             bg=PALETTE["bg"],
             fg=PALETTE["text_light"],
-            font=("Helvetica", 22, "bold"),
+            font=("SF Pro Display", 21, "bold"),
         ).pack(anchor="w")
 
         tk.Label(
@@ -1172,7 +1204,7 @@ class DashboardWindow:
                 text=f"•  {line}",
                 bg=PALETTE["bg"],
                 fg=PALETTE["text_light"],
-                font=("Helvetica", 11),
+                font=("SF Pro Text", 11),
                 wraplength=620,
                 justify="left",
                 anchor="w",
@@ -1185,14 +1217,16 @@ class DashboardWindow:
 
 
 def _format_countdown(delta: timedelta) -> str:
+    """Bare duration, e.g. "1h 28m 25s". Callers add their own "in " prefix —
+    this used to include one too, which rendered as "in in 1h 28m 25s"."""
     total_seconds = max(0, int(delta.total_seconds()))
     hours, rem = divmod(total_seconds, 3600)
     minutes, seconds = divmod(rem, 60)
     if hours:
-        return f"in {hours}h {minutes:02d}m {seconds:02d}s"
+        return f"{hours}h {minutes:02d}m {seconds:02d}s"
     if minutes:
-        return f"in {minutes}m {seconds:02d}s"
-    return f"in {seconds}s"
+        return f"{minutes}m {seconds:02d}s"
+    return f"{seconds}s"
 
 
 # ---------------------------------------------------------------------------
