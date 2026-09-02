@@ -13,7 +13,8 @@ Prayer times are calculated from each visitor's own location (latitude & longitu
 - Duaa right after each athan finishes
 - Surat Al-Kahf on Fridays (Dhuhr + 120 min)
 - Morning Azkar (Dhuhr − 240 min) and Night Azkar (Asr + 135 min)
-- Podcast playlist: the complete mushaf of Sheikh Mahmoud Ali Al-Banna in Quran order (Al-Fatiha → An-Nas), playing the identical recordings from the YouTube playlist (PL8475A8813886C6A5) via the YouTube player, with links to the Spotify show and the playlist
+- Quran tab: four complete mushafs behind a reciter selector, streamed as direct MP3s from mp3quran.net — محمد رفعت (31 surahs, all that survive), محمود خليل الحصري (ورش عن نافع), مصطفى إسماعيل and محمود علي البنا. A surah rolls into the next; at the end of a mushaf the next reciter starts from الفاتحة, wrapping indefinitely. The chosen reciter is remembered per device.
+- Morning Quran: plays on its own from the end of the Fajr athan chain until an hour (configurable) after the Morning Azkar. The Azkar still take priority inside that window.
 - Test Athan button cycles through the five prayers, playing each prayer's own athan file in turn
 - Live next-prayer countdown, Hijri date, activity log
 - Settings panel (per-visitor, saved in the browser)

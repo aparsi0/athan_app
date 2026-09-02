@@ -24,7 +24,7 @@ git add -A && git commit -m "..." && git push
 ```
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v24**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v25**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -63,21 +63,21 @@ athan_app/
 │   └── candidates/                         theme-photo comparison pages
 │
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
-    ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (328 lines)
+    ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (349 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v24                    (104 lines)
+    ├── sw.js                  service worker — cache version v25                    (104 lines)
     ├── README.md              web-app-specific readme
-    ├── css/style.css          full site styling, responsive, RTL Arabic support     (378 lines)
+    ├── css/style.css          full site styling, responsive, RTL Arabic support     (382 lines)
     ├── js/
-    │   ├── config.js            defaults + localStorage persistence, Safari-safe helpers (165)
+    │   ├── config.js            defaults + localStorage persistence, Safari-safe helpers (175)
     │   ├── location.js          browser geolocation → reverse-geocode → IP fallback    (129)
     │   ├── prayer-times.js      Aladhan API client + per-day cache                      (88)
-    │   ├── scheduler.js         builds/fires today's event list, midnight rollover     (203)
+    │   ├── scheduler.js         builds/fires today's event list, midnight rollover     (233)
     │   ├── audio.js             single reusable <audio> element, keep-alive loop        (177)
     │   ├── scene.js             ★ 20-frame living-sky engine (see §5)                  (440)
-    │   ├── podcast.js           Quran tab 1 — YouTube playlist, seek bar, resume logic  (414)
-    │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (425)
-    │   └── app.js               wires everything, UI rendering, settings, Test Athan    (491)
+    │   ├── reciters.js          ★ Quran tab — 4 mushafs, selector, endless rotation   (170)
+    │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (444)
+    │   └── app.js               wires everything, UI rendering, settings, Test Athan    (536)
     └── assets/
         ├── audio/*.m4a           same 11 recordings as desktop (~63 MB)
         ├── icons/                 PWA icons (SVG + 180/192/512 PNG)
@@ -307,6 +307,46 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     addresses (`n12`, `n0b`, `stream.`, and the radio.garden resolver). المصحف المعلم and
     the radio both play, mutual exclusion works, and pause/resume round-trips correctly.
 
+19. **Quran tab rebuilt around a reciter selector (2026-09-02).** Four complete mushafs, all
+    direct MP3s from mp3quran.net (3-digit zero-padded, the same URL shape as المصحف المعلم,
+    so `makeAudioPlayer` was reused rather than replaced):
+
+    | id | sheikh | mushaf | server | surahs |
+    |---|---|---|---|---|
+    | `refat` | محمد رفعت | تسجيلات حفلات | `server14/refat/` | **31** |
+    | `husr-warsh` | محمود خليل الحصري | ورش عن نافع | `server13/husr/Rewayat-Warsh-A-n-Nafi/` | 114 |
+    | `mustafa` | مصطفى إسماعيل | حفص عن عاصم — مرتل | `server8/mustafa/` | 114 |
+    | `bna` | محمود علي البنا | حفص عن عاصم — مرتل | `server8/bna/` | 114 |
+
+    A surah auto-advances; at the end of a mushaf the **next reciter** starts from الفاتحة,
+    wrapping past the last back to the first, indefinitely. Choice remembered per visitor.
+    **محمد رفعت is a partial mushaf on purpose** — he died in 1950 having never recorded a
+    complete one, and only 31 surahs survive. He is stored as *real surah numbers*, not list
+    positions, so list position 5 requests `018.mp3` (الكهف) and his mushaf ends at العاديات.
+
+20. **Morning Quran (2026-09-02).** Starts when the Fajr athan **and its duaa** finish — an
+    outcome, not a clock time, so it hangs off the end of the chain rather than a schedule
+    entry — and stops at a scheduled event, Morning Azkar + 60 min (configurable 0–240).
+    Defaults to محمد رفعت. The Morning Azkar falls *inside* the window and still takes
+    priority: the Quran pauses and resumes through the normal athan pipeline. A page opened
+    mid-window resumes the surah it left on (`audio_settings.morning_quran_index`).
+
+21. **The YouTube player was removed (2026-09-02).** With Al-Banna served as MP3s, `podcast.js`
+    had no purpose left, and it was the app's largest trust concession — an iframe that can
+    execute code, versus `<audio>` tags that cannot. The CSP shrank accordingly:
+    `script-src` to `'self'`, `frame-src` to `'none'`, YouTube out of `connect-src` and
+    `img-src`, and `https://*.mp3quran.net` into `media-src` (a wildcard: the files span
+    server7–server16). This also ends the "YouTube requires its player stay visible"
+    constraint, which mattered for hours of unattended morning playback.
+
+22. **Spotify was re-evaluated and rejected again (2026-09-02).** Same conclusion as changelog
+    item 2, now with evidence: both a linked show and album embed serve preview clips when
+    logged out (`audioPreview` → `p.scdn.co/mp3-preview/…`, and a 42 s
+    `podz-content…/clip_0_*.mp3`), the owner's Premium does not extend to visitors, and an
+    iframe gives no dependable track-ended signal to drive auto-advance. Decisively, the
+    محمد رفعت album is **verse-range excerpts** ("من 25 - 29 سورة البقرة"), not surahs, so
+    an ordered الفاتحة→الناس sequence was never possible from it.
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind)
@@ -320,11 +360,10 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
 - **Bundle the most-played surahs**: Al-Fatiha, Ya-Sin, Al-Mulk, Al-Waqi'ah and the last juz at
   48–64 kbps mono (~50–100 MB) would play offline and survive any outage. Hosting all 114 is not
   an option — GitHub Pages caps a site at 1 GB and the full teaching mushaf exceeds that.
-- **More reciters**: additional full-mushaf sheikhs with a reciter selector, remembered per
-  visitor. el-hosary.com already hosts several more mushafs in the same URL shape
-  (المجود، المفسر، حفص الإذاعة المصرية، ورش، قالون) — cheapest next source.
-- **Morning auto-play**: a chosen Quran source playing automatically between sunrise and the
-  morning Azkar, toggleable in Settings.
+- **More reciters still**: adding one is a single entry in `RECITERS` (`docs/js/reciters.js`)
+  plus its host in `media-src`. mp3quran.net lists 241 reciters; the API that enumerates them
+  is `https://mp3quran.net/api/v3/reciters?language=ar`, and a moshaf entry's `server` field
+  plus `NNN.mp3` is the whole URL. Verify a new one loads before shipping it.
 
 ---
 
