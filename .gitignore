@@ -27,3 +27,7 @@ athan_app.log
 # Design deliverable archives
 *.zip
 Dynamic day-night website theme/
+
+# Temporary reciter audition page (delete when the picks are made)
+_audition/
+session-review.diff
