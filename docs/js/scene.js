@@ -114,14 +114,31 @@ const Scene = {
   // at the next Fajr, closing the loop.
   _buildAnchors() {
     const T = this.times;
-    const F = T.fajr, SR = T.sunrise, N = T.dhuhr, MG = T.maghrib, I = T.isha;
+    const F = T.fajr;
+    // Every anchor lives on a single increasing timeline [F, F+1440]. The
+    // times arrive as minutes-since-LOCAL-midnight, so any prayer that falls
+    // after midnight (Isha at "00:13" in a high-latitude summer, or simply a
+    // late-Isha calculation method) comes back as a small number — i.e. ~23
+    // hours BEFORE Maghrib on this timeline. Roll each one forward past the
+    // previous so the sequence is always ascending; without this the segment
+    // scan in _position() can never match the reversed spans, and frames 17,
+    // 18 and 19 are never displayed: the scene jumps from golden hour
+    // straight to deep night at Maghrib and holds there until Fajr.
+    const roll = (v, after) => { let x = v; while (x < after) x += 1440; return x; };
+    const SR = roll(T.sunrise, F);
+    const N  = roll(T.dhuhr,   SR);
+    const MG = roll(T.maghrib, N);
+    const I  = roll(T.isha,    MG);
     const nextF = F + 1440;
-    const nightLen = nextF - I;
+    const nightLen = Math.max(1, nextF - I);
     const lerp = (a, b, t) => a + (b - a) * t;
 
     // Fajr holds 20 minutes, then 2/3/4/5 evenly split what's left until Sunrise.
-    const dawnStart = F + 20;
-    const dawnSpan = SR - dawnStart;
+    // Never let the hold eat past Sunrise: when the twilight window is shorter
+    // than 20 minutes the hold used to push anchor 2 beyond anchor 6, which
+    // reversed 2..6 and hid the sunrise frame until Fajr+20.
+    const dawnStart = Math.min(F + 20, F + Math.max(0, (SR - F) * 0.5));
+    const dawnSpan = Math.max(0, SR - dawnStart);
 
     // index -> absolute minute on the [F, F+1440] timeline
     const at = {
@@ -150,6 +167,15 @@ const Scene = {
     const order = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
     this.anchors = order.map(i => ({ i, t: at[i] }));
     this.anchors.push({ i: 1, t: nextF }); // wrap sentinel
+    // Final safety net. _position() walks the anchors expecting them to
+    // ascend; one out-of-order entry makes every later frame unreachable.
+    // Degenerate inputs still exist (polar day/night, where Aladhan can return
+    // equal or missing times), so clamp rather than trust the arithmetic.
+    for (let k = 1; k < this.anchors.length; k++) {
+      if (!Number.isFinite(this.anchors[k].t) || this.anchors[k].t < this.anchors[k - 1].t) {
+        this.anchors[k].t = this.anchors[k - 1].t;
+      }
+    }
     this._fajr = F;
 
     // Per-segment fade-duration overrides (minutes), keyed by the ARRIVING
@@ -290,7 +316,11 @@ const Scene = {
   /* ---------- overlays (all subtle) ---------- */
   _overlays(ctx, t, nowMin, ci) {
     const { W, H } = this;
-    const T = this.times, F = T.fajr, SR = T.sunrise, MG = T.maghrib, I = T.isha;
+    const T = this.times, F = T.fajr, SR = T.sunrise, MG = T.maghrib;
+    // Same wrap problem as _buildAnchors: an Isha after midnight is a small
+    // number, so _smooth(MG + 10, I + 30, …) got b < a and clamped to 0 —
+    // no stars and no shooting stars between Maghrib and local midnight.
+    const I = T.isha < MG ? T.isha + 1440 : T.isha;
 
     // Night factor for stars (dark sky only).
     let night = 0;
