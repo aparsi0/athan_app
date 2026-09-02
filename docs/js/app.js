@@ -24,7 +24,17 @@ const App = {
     AudioManager.onStateChange = (label) => this.renderNowPlaying(label);
 
     Scheduler.onEvent = (event) => this.handleEvent(event);
-    Scheduler.onRefresh = () => this.renderSchedule();
+    Scheduler.onRefresh = () => {
+      this.renderSchedule();
+      // Re-evaluate the morning window on every (re)build. This is what makes
+      // a page opened mid-morning pick up — a fixed timer after init raced the
+      // location prompt and the prayer-times fetch and usually lost, with no
+      // retry. It also handles the reverse: a rebuild whose new end time is
+      // already in the past can never fire its stop event, so disabling the
+      // feature or shortening the window mid-morning has to stop it here.
+      if (Scheduler.inMorningWindow()) this.startMorningQuran('within the morning window');
+      else this.stopMorningQuran();
+    };
 
     await this.resolveLocation();
     await this.loadPrayerTimes();
@@ -139,11 +149,7 @@ const App = {
 
   async handleEvent(event) {
     if (event.kind === 'morning_quran_end') {
-      if (Reciters.player?.playing || Reciters.player?._shouldBePlaying) {
-        Reciters.player.pause();
-        Reciters.player.cancelResume();
-        this.logStatus('🕌 Morning Quran window has ended.');
-      }
+      this.stopMorningQuran();
       return;
     }
 
@@ -155,6 +161,11 @@ const App = {
 
     if (event.missed) {
       this.logStatus(`⏰ Missed ${event.label} at ${this.fmtTime(event.time)} — the tab was suspended by the browser. Keep the tab open (not just minimized), or see the tips in the panel below.`);
+      // A suspended tab is the most likely way to reach mid-morning, so a
+      // Fajr we slept through must still open the morning Quran window.
+      if (event.kind === 'athan' && event.prayer === 'fajr') {
+        this.startMorningQuran('Fajr passed while the tab was suspended');
+      }
       this.renderSchedule();
       return;
     }
@@ -211,16 +222,41 @@ const App = {
     if (typeof Reciters === 'undefined' || !Reciters.player) return;
     if (!Scheduler.inMorningWindow()) return;
     if (AudioManager.isPlaying()) return;          // athan/azkar always wins
-    if (Reciters.player.playing) return;           // already running
+    // `playing` is only set by the audio element's own 'playing' event, which
+    // cannot have fired yet when this is called straight after resumeAll().
+    // _shouldBePlaying is set synchronously, so it is the honest test for
+    // "already going or about to be" — without it this would yank a listener
+    // off the surah they were on and restart at الفاتحة.
+    if (Reciters.player.playing || Reciters.player._shouldBePlaying) return;
+    // Nothing can play before the visitor has tapped the sound gate; trying
+    // anyway logs a scary failure and leaves the watchdog nudging forever.
+    if (!AudioManager.unlocked) return;
 
-    if (cfg.reciter_id) Reciters.selectById(cfg.reciter_id);
+    // Read the saved position BEFORE switching reciter — selecting a
+    // different one deliberately clears it.
+    const saved = Number(Config.get('audio_settings.quran_last_index', 0)) || 0;
+    const wanted = cfg.reciter_id || RECITERS[0].id;
+    const sameReciter = Reciters.active().id === wanted;
+    Reciters.selectById(wanted);
+    const at = sameReciter ? saved : 0;
+
     const sheikh = Reciters.active().sheikh;
     const until = Scheduler.morningWindow ? this.fmtTime(Scheduler.morningWindow.end) : '';
     this.logStatus(`🕌 Morning Quran — ${sheikh}${until ? ` until ${until}` : ''} (${why}).`);
-    // Resume where this device left off rather than always restarting at
-    // الفاتحة, so a reload mid-morning picks up the surah that was playing.
-    const at = Number(Config.get('audio_settings.morning_quran_index', 0)) || 0;
     Reciters.player.play(at);
+  },
+
+  /** Stop the morning Quran for good. Unconditional on purpose: if another
+   *  event paused the player first, `playing` and `_shouldBePlaying` are both
+   *  false while `_resumeWanted` is still true, so guarding on them let the
+   *  next resumeAll() restart the Quran after its window had closed. */
+  stopMorningQuran() {
+    if (typeof Reciters === 'undefined' || !Reciters.player) return;
+    const wasOn = Reciters.player.playing || Reciters.player._shouldBePlaying
+      || Reciters.player._resumeWanted;
+    Reciters.player.pause();
+    Reciters.player.cancelResume();
+    if (wasOn) this.logStatus('🕌 Morning Quran window has ended.');
   },
 
   notify(body) {
@@ -347,6 +383,9 @@ const App = {
       AudioManager.startKeepAlive();
       gate.classList.add('hidden');
       this.logStatus(ok ? '🔊 Sound enabled — athan will play automatically.' : '⚠️ Sound could not be enabled.');
+      // Nothing could autoplay before this tap, so if we are already inside
+      // the morning window this is the first moment it can actually start.
+      if (ok) this.startMorningQuran('sound enabled during the morning window');
       if (Config.get('ui_settings.show_notifications', true) && 'Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
       }
@@ -360,9 +399,6 @@ const App = {
     document.getElementById('locateBtn').addEventListener('click', () => this.useMyLocation(false));
 
     Reciters.init();
-    // A page opened or reloaded mid-morning should carry on, not sit silent.
-    // Deferred so prayer times (and therefore the window) are known first.
-    setTimeout(() => this.startMorningQuran('page opened during the morning window'), 4000);
     Moalem.init();
     QuranRadio.init();
 
