@@ -12,14 +12,18 @@ const Scheduler = {
   onEvent: null,        // callback(event)
   onRefresh: null,      // callback() after a (re)build
   _fired: new Set(),    // event names already fired today (survives rebuilds)
-  _queue: [],           // events waiting to be handled, one at a time
-  _draining: false,
 
   /** (Re)build today's schedule from prayerData + config. */
   build(prayerData) {
     this.prayerData = prayerData;
     this.events = [];
-    this.dateKey = new Date().toDateString();
+    const key = new Date().toDateString();
+    // _tick clears _fired at its own rollover, but build() can cross a day
+    // boundary first (a retry landing after midnight while the tab was
+    // frozen). Without this, yesterday's names would suppress every prayer
+    // for the whole new day.
+    if (this.dateKey !== key) this._fired.clear();
+    this.dateKey = key;
 
     const times = prayerData.prayer_times;
     const enabled = Config.get('prayer_settings.enabled_prayers', {});
@@ -149,6 +153,7 @@ const Scheduler = {
     // an event it still plays when recent (grace window); older ones are only
     // reported, so a long-suspended tab doesn't fire hours of backlog at once.
     const GRACE_MS = 10 * 60 * 1000;
+    const due = [];
     for (const event of this.events) {
       if (event.time > this.lastTick && event.time <= now) {
         // A rebuild (settings save, location change) recomputes event times
@@ -156,9 +161,17 @@ const Scheduler = {
         // could land in the future again and fire a second time.
         if (this._fired.has(event.name)) continue;
         this._fired.add(event.name);
-        this._enqueue(now - event.time > GRACE_MS ? { ...event, missed: true } : event);
+        due.push(now - event.time > GRACE_MS ? { ...event, missed: true } : event);
       }
     }
+    // The athan is the point of the app, so when several events come due in
+    // the same tick it goes first. Handlers are NOT serialized and the athan
+    // is never queued behind a reminder: AudioManager.play() stops whatever
+    // is sounding, which is the priority mechanism. App.handleEvent declines
+    // to start a reminder while prayer audio is playing, which is what stops
+    // a collision from truncating the athan and swallowing its duaa.
+    due.sort((a, b) => (a.kind === 'athan' ? 0 : 1) - (b.kind === 'athan' ? 0 : 1));
+    for (const event of due) this.onEvent?.(event);
 
     // Midnight rollover → ask for a fresh fetch/build.
     if (now.toDateString() !== this.dateKey) {
@@ -170,36 +183,10 @@ const Scheduler = {
       // returning before the event loop so no athan could fire at all.
       this.dateKey = now.toDateString();
       this._fired.clear();
-      this._enqueue({ name: 'daily_refresh', kind: 'refresh', time: now, label: 'Daily refresh' });
+      this.onEvent?.({ name: 'daily_refresh', kind: 'refresh', time: now, label: 'Daily refresh' });
     }
 
     this.lastTick = now;
-  },
-
-  /** Queue an event and make sure the drain loop is running. */
-  _enqueue(event) {
-    this._queue.push(event);
-    this._drain();
-  },
-
-  /** Handle queued events strictly one at a time.
-   *  onEvent is async (it awaits the athan finishing so it can chain the
-   *  duaa). Firing two due events in the same tick synchronously meant the
-   *  second one's AudioManager.play() called stop() on the first — cutting the
-   *  athan off after a few milliseconds and, because its promise then resolved
-   *  'stopped' rather than 'ended', silently skipping the after-prayer duaa. */
-  async _drain() {
-    if (this._draining) return;
-    this._draining = true;
-    try {
-      while (this._queue.length) {
-        const event = this._queue.shift();
-        try { await this.onEvent?.(event); }
-        catch (e) { console.error('[scheduler] handler failed for', event.name, e); }
-      }
-    } finally {
-      this._draining = false;
-    }
   },
 
   nextPrayer() {

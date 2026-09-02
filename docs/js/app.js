@@ -86,10 +86,22 @@ const App = {
     // the scheduler was stuck in its rollover branch this ran ~2x/second, each
     // call clearing the 60s retry a moment after it was set, so the backoff
     // never actually elapsed and the API was hammered continuously.
-    if (this._loadingTimes) return this._loadingTimes;
-    if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null; }
     const method = Config.get('prayer_settings.calculation_method', 2);
+    const key = `${this.location?.latitude},${this.location?.longitude},${method},${new Date().toDateString()}`;
+    if (this._loadingTimes) {
+      // Only coalesce a request for the SAME coordinates, method and day.
+      // Blindly returning the in-flight promise dropped the refetch that the
+      // location prompt, the 📍 button and a calculation-method change each
+      // trigger — leaving the user on the previous location's times all day,
+      // since loadPrayerTimes is the only caller of Scheduler.build().
+      if (this._loadingKey === key) return this._loadingTimes;
+      this._pendingReload = true;   // re-run once the in-flight fetch settles
+      return this._loadingTimes;
+    }
+    if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null; }
     let resolveInFlight;
+    this._loadingKey = key;
+    this._pendingReload = false;
     this._loadingTimes = new Promise((r) => { resolveInFlight = r; });
     try {
       this.logStatus('Fetching today\'s prayer times…');
@@ -115,7 +127,11 @@ const App = {
       this._retryTimer = setTimeout(() => { this._retryTimer = null; this.loadPrayerTimes(); }, wait);
     } finally {
       this._loadingTimes = null;
+      this._loadingKey = null;
       resolveInFlight();
+      // A caller asked for different coordinates/method/day while this fetch
+      // was open. Honour it now rather than dropping it.
+      if (this._pendingReload) { this._pendingReload = false; this.loadPrayerTimes(); }
     }
   },
 
@@ -130,6 +146,17 @@ const App = {
 
     if (event.missed) {
       this.logStatus(`⏰ Missed ${event.label} at ${this.fmtTime(event.time)} — the tab was suspended by the browser. Keep the tab open (not just minimized), or see the tips in the panel below.`);
+      this.renderSchedule();
+      return;
+    }
+
+    // Reminders yield to prayer audio. AudioManager.play() stops whatever is
+    // sounding, so without this a woduaa/azkar landing on a prayer minute cut
+    // the athan off after milliseconds — and because the athan's promise then
+    // resolved 'stopped' rather than 'ended', its after-prayer duaa was
+    // silently skipped too. The athan itself still pre-empts everything.
+    if (event.kind !== 'athan' && AudioManager.isPlaying()) {
+      this.logStatus(`⏭ Skipped ${event.label} — prayer audio is playing and takes priority.`);
       this.renderSchedule();
       return;
     }
@@ -351,8 +378,13 @@ const App = {
    *  throw propagated out of init() and left the whole app dead: no tab bar,
    *  no Stop button, no prayer times, no athan. */
   _testIndexGet() {
-    try { return Number(localStorage.getItem(this._testIndexKey) || 0) % PRAYER_NAMES.length; }
-    catch { return this._testIndexFallback || 0; }
+    let i;
+    try { i = Number(localStorage.getItem(this._testIndexKey) || 0) % PRAYER_NAMES.length; }
+    catch { i = this._testIndexFallback || 0; }
+    // A junk stored value gives NaN, and PRAYER_NAMES[NaN] is undefined —
+    // which throws out of bindUI() and kills init(), the very outcome the
+    // try/catch above exists to prevent.
+    return Number.isFinite(i) ? i : 0;
   },
   _testIndexSet(i) {
     this._testIndexFallback = i;
@@ -423,7 +455,17 @@ const App = {
       Config.set(`special_audio_settings.${key}.enabled`, document.getElementById(`sp_${key}`).checked);
       Config.set(`special_audio_settings.${key}.volume`, Number(document.getElementById(`vol_${key}`).value));
     }
-    Config.set('special_audio_settings.pre_prayer_woduaa.lead_minutes', Number(document.getElementById('woduaaLead').value));
+    // The field is min=1 max=120, but an EMPTY input gives Number('') === 0,
+    // which would schedule the reminder at the exact prayer minute (where the
+    // scheduler now drops it) and silently remove all five woduaa reminders.
+    // Clamp to the same range the input advertises.
+    const leadRaw = Number(document.getElementById('woduaaLead').value);
+    const lead = Number.isFinite(leadRaw) && leadRaw >= 1 ? Math.min(leadRaw, 120) : 15;
+    if (lead !== leadRaw) {
+      document.getElementById('woduaaLead').value = lead;
+      this.logStatus(`Woduaa lead must be 1–120 minutes — using ${lead}.`);
+    }
+    Config.set('special_audio_settings.pre_prayer_woduaa.lead_minutes', lead);
 
     const auto = document.getElementById('autoDetect').checked;
     Config.set('location.auto_detect', auto);

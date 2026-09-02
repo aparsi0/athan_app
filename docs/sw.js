@@ -4,6 +4,16 @@
  * Bump CACHE_VERSION when deploying changes to force clients to update.
  */
 const CACHE_VERSION = 'athan-web-v24';
+// Entries the app cannot run without. If any of these fail to precache the
+// install must FAIL, so the previous worker stays in control with its intact
+// cache and the install is retried on the next load. Swallowing every error
+// would activate a half-empty cache — and activate() deletes every other
+// cache, destroying the only working copy.
+const CRITICAL = new Set([
+  '.', 'index.html', 'css/style.css',
+  'js/config.js', 'js/location.js', 'js/prayer-times.js', 'js/audio.js',
+  'js/scene.js', 'js/podcast.js', 'js/audio-players.js', 'js/scheduler.js', 'js/app.js'
+]);
 const APP_SHELL = [
   '.',
   'index.html',
@@ -22,17 +32,20 @@ const APP_SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-  // Precache file-by-file rather than with cache.addAll(): addAll() is
-  // all-or-nothing, so a single 404 (or one asset briefly unavailable on a
-  // fresh deploy) would reject, abort the install and leave the site with no
-  // service worker at all. allSettled() keeps whatever succeeded.
+  // Precache file-by-file rather than with cache.addAll(), which is
+  // all-or-nothing: one optional asset 404ing would abort the whole install.
+  // But a failure among the CRITICAL entries must still abort, so a broken
+  // install can never activate and wipe the working cache.
   // {cache: 'reload'} bypasses the browser's own HTTP cache — GitHub Pages
   // serves max-age=600, so without it a bump can precache the OLD files under
   // the NEW cache name, and activate() then deletes the only other copy.
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => Promise.allSettled(
+    caches.open(CACHE_VERSION).then((cache) => Promise.all(
       APP_SHELL.map((url) => cache.add(new Request(url, { cache: 'reload' }))
-        .catch((e) => { console.warn('[sw] precache miss:', url, e.message); }))
+        .catch((e) => {
+          if (CRITICAL.has(url)) throw new Error(`precache failed for ${url}: ${e.message}`);
+          console.warn('[sw] optional precache miss:', url, e.message);
+        }))
     )).then(() => self.skipWaiting())
   );
 });
