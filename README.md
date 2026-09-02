@@ -18,6 +18,20 @@ An automated Islamic prayer time application that plays the Athan (call to praye
 - **Configurable**: Customizable settings and preferences
 - **Reliable Scheduling**: Automatic daily refresh of prayer times
 
+There is also a **browser version** at <https://aparsi0.github.io/athan_app/> (source in
+`docs/`) with everything above plus a Quran tab — four complete mushafs behind a reciter
+selector that rolls from one to the next indefinitely — a morning Quran window, a live
+Cairo radio stream, and a 20-frame painted sky anchored to your real solar times.
+
+## 🌍 Prefer the web version?
+
+**<https://aparsi0.github.io/athan_app/>** — nothing to install. It runs in any browser,
+uses your own location and timezone, plays the same athan and reminder audio, and adds a
+Quran tab with four complete mushafs and a living day/night sky. Installable as a PWA.
+
+Everything below is for the **desktop app**, which runs natively in the macOS menu bar and
+keeps working whether or not a browser is open.
+
 ## 🚀 Installation
 
 ### Before You Start
@@ -40,10 +54,20 @@ You need these things on any computer:
    ```bash
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
-4. Install Python:
+4. Install Python **and Tkinter**:
    ```bash
    brew install python
+   brew install python-tk
    ```
+   > ⚠️ **Do not skip `python-tk`.** Homebrew ships Python without Tkinter — it is a
+   > separate formula. Without it the app still runs and the menu-bar icon still
+   > appears, but **clicking it opens nothing**, because the dashboard window dies on
+   > `import tkinter`. If you use a specific version, match it: `brew install python-tk@3.14`.
+   >
+   > Check it worked:
+   > ```bash
+   > python3 -c "import tkinter; print(tkinter.TkVersion)"
+   > ```
 5. Install VLC:
    ```bash
    brew install --cask vlc
@@ -86,10 +110,20 @@ You need these things on any computer:
    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
    eval "$(/opt/homebrew/bin/brew shellenv)"
    ```
-4. Install Python:
+4. Install Python **and Tkinter**:
    ```bash
    brew install python
+   brew install python-tk
    ```
+   > ⚠️ **Do not skip `python-tk`.** Homebrew ships Python without Tkinter — it is a
+   > separate formula. Without it the app still runs and the menu-bar icon still
+   > appears, but **clicking it opens nothing**, because the dashboard window dies on
+   > `import tkinter`. If you use a specific version, match it: `brew install python-tk@3.14`.
+   >
+   > Check it worked:
+   > ```bash
+   > python3 -c "import tkinter; print(tkinter.TkVersion)"
+   > ```
 5. Install VLC:
    ```bash
    brew install --cask vlc
@@ -268,7 +302,12 @@ Run this from the project folder after activating the virtual environment:
 
 ```bash
 python3 test_core.py
+python3 -c "import tkinter; print('tkinter OK', tkinter.TkVersion)"
 ```
+
+The second line matters as much as the first. If it raises
+`ModuleNotFoundError: No module named '_tkinter'`, the app will run and play the
+athan but its window will never open — see Troubleshooting below.
 
 On Windows:
 
@@ -542,7 +581,8 @@ Isha:    09:39 PM
 ### Dependencies
 - `python3` and `pip3`
 - `vlc` media player
-- `tkinter` (for GUI notifications)
+- `tkinter` (the dashboard window). **On macOS Homebrew this is a separate formula**
+  — `brew install python-tk` — and is not included by `brew install python`
 - Python packages (auto-installed):
   - `schedule`, `python-vlc`, `pystray`, `requests`, `pytz`
 
@@ -568,12 +608,43 @@ curl -s "https://api.aladhan.com/v1/status" | grep -q "OK" && echo "✅ API acce
 tail -f ~/.athan_app/athan_app.log
 ```
 
-**3. System tray not appearing**
+**3. Menu-bar icon appears but clicking it opens nothing**
+
+This is almost always missing Tkinter. Check first:
+
+```bash
+.venv/bin/python -c "import tkinter"
+```
+
+`ModuleNotFoundError: No module named '_tkinter'` confirms it. Homebrew ships Python
+without Tkinter:
+
+```bash
+brew install python-tk        # or python-tk@3.14 to match your version
+rm -rf .venv && python3 -m venv .venv
+pip install -r requirements.txt -r requirements-desktop.txt
+```
+
+**If you run the packaged app** (`dist/AthanApp.app`, which is what the menu-bar
+launchd agent starts), fixing the venv is not enough — the bundle was built without
+Tk and has to be rebuilt:
+
+```bash
+bash packaging/build_macos_app.sh
+launchctl kickstart -k gui/$(id -u)/com.apa.athan-app
+```
+
+The build script now refuses to run if Tkinter is missing, so it cannot silently
+produce a window-less app again.
+
+The helper window's errors are written to `~/.athan_app/helper-window.log`.
+
+**4. System tray not appearing**
 - Ensure you're running in a desktop environment
 - Try the headless version: `athan-app-headless`
 - Check if system tray is enabled in your desktop environment
 
-**4. Permission errors**
+**5. Permission errors**
 ```bash
 # Fix permissions
 chmod +x ~/.athan_app/main.py
@@ -591,9 +662,9 @@ python3 main_headless.py 2>&1 | tee debug.log
 ## 📚 API Information
 
 **Prayer Times API**: [Aladhan.com](https://aladhan.com/prayer-times-api)
-- **Calculation Method**: ISNA (Method 2)
-- **Location**: Raleigh, NC coordinates
-- **Timezone**: America/New_York
+- **Calculation Method**: ISNA (Method 2) by default; 13 methods are selectable
+- **Location**: detected at startup, or set manually in Settings — not fixed to any city
+- **Timezone**: taken from your system
 - **Update Frequency**: Daily at midnight
 
 ## 🤝 Support
