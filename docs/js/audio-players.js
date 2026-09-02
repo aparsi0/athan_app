@@ -20,6 +20,12 @@ const QuranPlayers = {
       if (p !== except && typeof p.stopForOther === 'function') p.stopForOther();
     }
   },
+  /** Is any Quran player sounding, about to, or waiting to resume after an
+   *  athan? Used to keep automatic playback from overriding a deliberate
+   *  choice — `playing` alone is not enough, since it lags the element. */
+  anyActive() {
+    return this.all.some((p) => p.playing || p._shouldBePlaying || p._resumeWanted);
+  },
   pauseAll() { for (const p of this.all) p.pause(); },
   resumeAll() { for (const p of this.all) p.maybeResume(); },
   cancelAll() { for (const p of this.all) p.cancelResume(); }
@@ -236,7 +242,10 @@ function makeAudioPlayer(opts) {
     // ---------- athan priority ----------
 
     pause() {
-      if (this.playing) this._resumeWanted = true;
+      // _shouldBePlaying is set synchronously by play(); `playing` waits for
+      // the element's own event. An athan arriving while a surah is still
+      // buffering would otherwise be forgotten and never resumed.
+      if (this.playing || this._shouldBePlaying) this._resumeWanted = true;
       this._shouldBePlaying = false;
       this.audio.pause();
     },

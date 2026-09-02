@@ -222,12 +222,14 @@ const App = {
     if (typeof Reciters === 'undefined' || !Reciters.player) return;
     if (!Scheduler.inMorningWindow()) return;
     if (AudioManager.isPlaying()) return;          // athan/azkar always wins
-    // `playing` is only set by the audio element's own 'playing' event, which
-    // cannot have fired yet when this is called straight after resumeAll().
-    // _shouldBePlaying is set synchronously, so it is the honest test for
-    // "already going or about to be" — without it this would yank a listener
-    // off the surah they were on and restart at الفاتحة.
-    if (Reciters.player.playing || Reciters.player._shouldBePlaying) return;
+    // Never override a deliberate choice. This has to consider EVERY Quran
+    // player, not just the reciters tab: someone who fell asleep to the Cairo
+    // radio, or to المصحف المعلم, has chosen what they want playing, and the
+    // morning auto-play would otherwise silence it and switch to رفعت.
+    // `playing` alone is not enough — it is set by the audio element's own
+    // event, which cannot have fired when this runs straight after
+    // resumeAll(); _shouldBePlaying and _resumeWanted are set synchronously.
+    if (QuranPlayers.anyActive()) return;
     // Nothing can play before the visitor has tapped the sound gate; trying
     // anyway logs a scary failure and leaves the watchdog nudging forever.
     if (!AudioManager.unlocked) return;
