@@ -40,7 +40,7 @@ SSH is the durable alternative (`git remote set-url origin git@github.com:aparsi
 and bypasses the Keychain, token scopes and the Claude GitHub App entirely.
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v26**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v27**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -81,7 +81,7 @@ athan_app/
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
     ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (349 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v26                    (104 lines)
+    ├── sw.js                  service worker — cache version v27                    (104 lines)
     ├── README.md              web-app-specific readme
     ├── css/style.css          full site styling, responsive, RTL Arabic support     (382 lines)
     ├── js/
@@ -340,9 +340,13 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     complete one, and only 31 surahs survive. He is stored as *real surah numbers*, not list
     positions, so list position 5 requests `018.mp3` (الكهف) and his mushaf ends at العاديات.
 
-20. **Morning Quran (2026-09-02).** Only ever starts when **nothing else is playing** —
-    `QuranPlayers.anyActive()`. Someone who fell asleep to the Cairo radio or to
-    المصحف المعلم has chosen what they want, and automatic playback must not override it.
+20. **Morning Quran (2026-09-02).** At its scheduled moment it **pre-empts**, exactly like the
+    athan, woduaa, duaa and azkar: whatever Quran tab was playing is stopped. That is the
+    `preempt` argument to `startMorningQuran`, passed only from the two Fajr paths.
+    Every other caller — a page opened mid-window, the sound-gate tap, and any schedule
+    rebuild (which happens on every settings save and location change) — is a *catch-up* and
+    yields via `QuranPlayers.anyActive()`. Without that split, saving an unrelated setting at
+    08:00 would cut off whatever the visitor had deliberately put on.
     Starts when the Fajr athan **and its duaa** finish — an
     outcome, not a clock time, so it hangs off the end of the chain rather than a schedule
     entry — and stops at a scheduled event, Morning Azkar + 60 min (configurable 0–240).
