@@ -81,10 +81,16 @@ const App = {
   // ---------- prayer times ----------
 
   async loadPrayerTimes() {
-    // Cancel any pending retry so overlapping callers (midnight refresh,
-    // settings save, a prior failure) can't stack multiple retry loops.
+    // Only one fetch at a time. The old code cancelled the pending retry timer
+    // instead, which stopped timers stacking but not CALLERS stacking: while
+    // the scheduler was stuck in its rollover branch this ran ~2x/second, each
+    // call clearing the 60s retry a moment after it was set, so the backoff
+    // never actually elapsed and the API was hammered continuously.
+    if (this._loadingTimes) return this._loadingTimes;
     if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null; }
     const method = Config.get('prayer_settings.calculation_method', 2);
+    let resolveInFlight;
+    this._loadingTimes = new Promise((r) => { resolveInFlight = r; });
     try {
       this.logStatus('Fetching today\'s prayer times…');
       const data = await PrayerTimesAPI.fetch(this.location.latitude, this.location.longitude, method);
@@ -98,10 +104,18 @@ const App = {
       }
       Scene.setTimes(mins);
       this.logStatus('Prayer times loaded ✓');
+      this._timesBackoff = 0;
     } catch (e) {
       console.error(e);
-      this.logStatus('⚠️ Could not fetch prayer times. Retrying in 60 s…');
-      this._retryTimer = setTimeout(() => { this._retryTimer = null; this.loadPrayerTimes(); }, 60000);
+      // Exponential backoff, capped at 10 minutes: a flat 60s retry against a
+      // provider that is down just burns requests all day.
+      const wait = Math.min(60000 * Math.pow(2, this._timesBackoff || 0), 600000);
+      this._timesBackoff = (this._timesBackoff || 0) + 1;
+      this.logStatus(`⚠️ Could not fetch prayer times. Retrying in ${Math.round(wait / 1000)} s…`);
+      this._retryTimer = setTimeout(() => { this._retryTimer = null; this.loadPrayerTimes(); }, wait);
+    } finally {
+      this._loadingTimes = null;
+      resolveInFlight();
     }
   },
 
@@ -327,14 +341,28 @@ const App = {
    */
   _testIndexKey: 'athan_web_test_index',
 
+  /** Touching window.localStorage THROWS (not returns null) when the browser
+   *  is set to block all site data, and setItem throws in old Safari private
+   *  mode. These ran inside bindUI(), before the scheduler was started, so the
+   *  throw propagated out of init() and left the whole app dead: no tab bar,
+   *  no Stop button, no prayer times, no athan. */
+  _testIndexGet() {
+    try { return Number(localStorage.getItem(this._testIndexKey) || 0) % PRAYER_NAMES.length; }
+    catch { return this._testIndexFallback || 0; }
+  },
+  _testIndexSet(i) {
+    this._testIndexFallback = i;
+    try { localStorage.setItem(this._testIndexKey, String(i)); } catch { /* no site data */ }
+  },
+
   async testNextAthan() {
-    const i = Number(localStorage.getItem(this._testIndexKey) || 0) % PRAYER_NAMES.length;
+    const i = this._testIndexGet();
     const prayer = PRAYER_NAMES[i];
     const files = Config.get('audio_settings.athan_files', {});
     const file = files[prayer] || Config.get('audio_settings.audio_file');
     const label = `${PRAYER_LABELS[prayer].en} Athan (test)`;
 
-    localStorage.setItem(this._testIndexKey, String((i + 1) % PRAYER_NAMES.length));
+    this._testIndexSet((i + 1) % PRAYER_NAMES.length);
     this.updateTestButton();
     this.logStatus(`Testing ${PRAYER_LABELS[prayer].en} athan (${i + 1}/${PRAYER_NAMES.length}) — its own audio file.`);
 
@@ -347,7 +375,7 @@ const App = {
   },
 
   updateTestButton() {
-    const i = Number(localStorage.getItem(this._testIndexKey) || 0) % PRAYER_NAMES.length;
+    const i = this._testIndexGet();
     document.getElementById('testBtn').textContent = `▶ Test Athan (${PRAYER_LABELS[PRAYER_NAMES[i]].en})`;
   },
 
