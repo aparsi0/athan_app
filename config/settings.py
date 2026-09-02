@@ -61,6 +61,9 @@ class ConfigManager:
             'audio_settings': {
                 'volume': 0.8,
                 'athan_volume': 0.8,
+                'quran_volume': 0.8,
+                'reciter_id': 'refat',
+                'quran_last_index': 0,
                 'audio_file': 'assets/audio/Azansoundtrack.m4a',
                 'athan_files': {
                     'fajr': 'assets/audio/fajr_athan.m4a',
@@ -98,6 +101,15 @@ class ConfigManager:
                     'offset_minutes': -180,
                     'audio_file': 'assets/audio/morning_audio.m4a',
                     'volume': 0.8
+                },
+                # Quran plays on its own through the morning: from the moment
+                # the Fajr athan and its duaa finish, until N minutes past the
+                # Morning Azkar above. Both ends move with the prayer times, so
+                # this is never a fixed hour.
+                'morning_quran': {
+                    'enabled': True,
+                    'reciter_id': 'refat',
+                    'end_after_azkar_minutes': 60
                 },
                 'night_audio': {
                     'enabled': True,

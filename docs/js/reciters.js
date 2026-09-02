@@ -17,55 +17,34 @@
  * Adding a reciter is one entry below plus its host in the media-src CSP.
  */
 
-/** The 114 surah names, in Quran order. Shared by every player in the app. */
-const SURAH_NAMES = [
-  'الفاتحة', 'البقرة', 'آل عمران', 'النساء', 'المائدة', 'الأنعام', 'الأعراف', 'الأنفال',
-  'التوبة', 'يونس', 'هود', 'يوسف', 'الرعد', 'إبراهيم', 'الحجر', 'النحل',
-  'الإسراء', 'الكهف', 'مريم', 'طه', 'الأنبياء', 'الحج', 'المؤمنون', 'النور',
-  'الفرقان', 'الشعراء', 'النمل', 'القصص', 'العنكبوت', 'الروم', 'لقمان', 'السجدة',
-  'الأحزاب', 'سبأ', 'فاطر', 'يس', 'الصافات', 'ص', 'الزمر', 'غافر',
-  'فصلت', 'الشورى', 'الزخرف', 'الدخان', 'الجاثية', 'الأحقاف', 'محمد', 'الفتح',
-  'الحجرات', 'ق', 'الذاريات', 'الطور', 'النجم', 'القمر', 'الرحمن', 'الواقعة',
-  'الحديد', 'المجادلة', 'الحشر', 'الممتحنة', 'الصف', 'الجمعة', 'المنافقون', 'التغابن',
-  'الطلاق', 'التحريم', 'الملك', 'القلم', 'الحاقة', 'المعارج', 'نوح', 'الجن',
-  'المزمل', 'المدثر', 'القيامة', 'الإنسان', 'المرسلات', 'النبأ', 'النازعات', 'عبس',
-  'التكوير', 'الانفطار', 'المطففين', 'الانشقاق', 'البروج', 'الطارق', 'الأعلى', 'الغاشية',
-  'الفجر', 'البلد', 'الشمس', 'الليل', 'الضحى', 'الشرح', 'التين', 'العلق',
-  'القدر', 'البينة', 'الزلزلة', 'العاديات', 'القارعة', 'التكاثر', 'العصر', 'الهمزة',
-  'الفيل', 'قريش', 'الماعون', 'الكوثر', 'الكافرون', 'النصر', 'المسد', 'الإخلاص',
-  'الفلق', 'الناس'
-];
+/* The reciter table and the 114 surah names now live in ONE file,
+   assets/reciters.json, which the desktop app reads too — so adding a reciter
+   is a single edit and the two apps cannot drift apart. Loaded at init(); the
+   service worker precaches it as a critical asset. */
+const SURAH_NAMES = [];
+const RECITERS = [];
 
-const RECITERS = [
-  {
-    id: 'refat',
-    sheikh: 'محمد رفعت',
-    mushaf: 'تسجيلات حفلات - الإذاعة المصرية',
-    server: 'https://server14.mp3quran.net/refat/',
-    // Real surah numbers, not list positions. Only these survive.
-    surahs: [1, 10, 11, 12, 17, 18, 19, 20, 48, 54, 55, 56, 69, 72, 73, 75, 76,
-             77, 78, 79, 81, 82, 83, 85, 86, 87, 88, 89, 96, 98, 100],
-    note: 'المصحف غير كامل - 31 سورة هي كل ما سُجّل'
-  },
-  {
-    id: 'husr-warsh',
-    sheikh: 'محمود خليل الحصري',
-    mushaf: 'ورش عن نافع - مرتل',
-    server: 'https://server13.mp3quran.net/husr/Rewayat-Warsh-A-n-Nafi/'
-  },
-  {
-    id: 'mustafa',
-    sheikh: 'مصطفى إسماعيل',
-    mushaf: 'حفص عن عاصم - مرتل',
-    server: 'https://server8.mp3quran.net/mustafa/'
-  },
-  {
-    id: 'bna',
-    sheikh: 'محمود علي البنا',
-    mushaf: 'حفص عن عاصم - مرتل',
-    server: 'https://server8.mp3quran.net/bna/'
+let _reciterDataPromise = null;
+function loadReciterData() {
+  if (!_reciterDataPromise) _reciterDataPromise = _fetchReciterData();
+  return _reciterDataPromise;
+}
+
+async function _fetchReciterData() {
+  const res = await fetchWithTimeout('assets/reciters.json', 8000);
+  if (!res.ok) throw new Error(`reciters.json: HTTP ${res.status}`);
+  const data = await res.json();
+  if (!Array.isArray(data.surah_names) || data.surah_names.length !== 114) {
+    throw new Error('reciters.json: surah_names must hold exactly 114 entries');
   }
-];
+  if (!Array.isArray(data.reciters) || !data.reciters.length) {
+    throw new Error('reciters.json: no reciters');
+  }
+  // Filled in place, not reassigned: audio-players.js captured SURAH_NAMES by
+  // reference at load time for المصحف المعلم.
+  SURAH_NAMES.length = 0; SURAH_NAMES.push(...data.surah_names);
+  RECITERS.length = 0;    RECITERS.push(...data.reciters);
+}
 
 /** Surah numbers a reciter offers (all 114 unless the entry narrows it). */
 function reciterSurahs(r) {
@@ -77,6 +56,7 @@ const Reciters = {
   current: 0,          // index into RECITERS
 
   init() {
+    if (!RECITERS.length) return;   // loadReciterData() must have run first
     const saved = Config.get('audio_settings.reciter_id', RECITERS[0].id);
     const at = RECITERS.findIndex((r) => r.id === saved);
     this.current = at >= 0 ? at : 0;

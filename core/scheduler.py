@@ -190,6 +190,7 @@ class PrayerScheduler:
 
             # Schedule custom non-prayer audio events.
             self._schedule_custom_audio_events()
+            self._schedule_morning_quran_window()
             
             # ALWAYS schedule daily refresh at midnight (00:01)
             # This ensures the script continues running for tomorrow
@@ -328,6 +329,58 @@ class PrayerScheduler:
         # registration (which fails for already-passed times) is best-effort.
         self._schedule_custom_audio_event(event_name, scheduled_time)
         return scheduled_time
+
+    def _schedule_morning_quran_window(self):
+        """Work out today's morning-Quran window and schedule its END.
+
+        The START is not a clock time — playback begins when the Fajr athan AND
+        its duaa have finished, which main.py hooks off the audio queue. Only
+        the end is schedulable, at the Morning Azkar plus a configurable gap.
+
+        Both ends move with the prayer times: the Azkar is itself relative
+        (Dhuhr - 240 by default), so this shifts every day and is recomputed on
+        each daily refresh. Nothing here is a fixed hour.
+        """
+        self.morning_quran_window = None
+        if not self.config_manager:
+            return
+        try:
+            cfg = self.config_manager.get('special_audio_settings.morning_quran', {}) or {}
+            if not cfg.get('enabled', False):
+                return
+            azkar = self.config_manager.get('special_audio_settings.morning_audio', {}) or {}
+            reference = str(azkar.get('reference_time', 'dhuhr'))
+            base = self.current_schedule.get(reference)
+            fajr = self.current_schedule.get('fajr')
+            if not base or not fajr:
+                logger.warning("Morning Quran window needs fajr and %s; skipping today", reference)
+                return
+            tail = int(cfg.get('end_after_azkar_minutes', 60))
+            end_time = self._calculate_relative_time(
+                base, int(azkar.get('offset_minutes', 0)) + tail
+            )
+            if not end_time:
+                return
+            self.morning_quran_window = {'start': fajr, 'end': end_time}
+            self._schedule_custom_audio_event('morning_quran_end', end_time)
+            logger.info("Morning Quran window today: %s -> %s", fajr, end_time)
+        except Exception as exc:
+            logger.error("Could not schedule the morning Quran window: %s", exc)
+
+    def in_morning_quran_window(self, when: Optional[datetime] = None) -> bool:
+        """Is `when` inside today's window? Used both by the Fajr hook and by a
+        restart part-way through the morning."""
+        window = getattr(self, 'morning_quran_window', None)
+        if not window:
+            return False
+        now = when or datetime.now()
+        try:
+            def at(text):
+                hour, minute = (int(part) for part in text.split(':')[:2])
+                return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            return at(window['start']) <= now < at(window['end'])
+        except (ValueError, KeyError):
+            return False
 
     def _schedule_prayer_relative_events(self):
         """Schedule events that occur relative to prayer times."""

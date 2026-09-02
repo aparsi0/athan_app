@@ -442,9 +442,16 @@ const App = {
 
     document.getElementById('locateBtn').addEventListener('click', () => this.useMyLocation(false));
 
-    Reciters.init();
-    Moalem.init();
-    QuranRadio.init();
+    // The reciter table and surah names come from assets/reciters.json, which
+    // المصحف المعلم also needs for its track list — so load once, then build
+    // every player. Failure is non-fatal: the athan side must still work.
+    loadReciterData()
+      .then(() => { Reciters.init(); Moalem.init(); QuranRadio.init(); })
+      .catch((e) => {
+        console.error('[app] reciter data failed to load', e);
+        this.logStatus(`⚠️ Quran tabs unavailable: ${e.message}`);
+        QuranRadio.init();   // the live radio needs no surah list
+      });
 
     document.getElementById('testBtn').addEventListener('click', () => this.testNextAthan());
     this.updateTestButton();
