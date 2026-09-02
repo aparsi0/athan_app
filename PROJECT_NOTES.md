@@ -410,9 +410,20 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     showing an actionable dialog when no interpreter can do Tk. The helper imports **only
     stdlib**, so system Python runs it fine — no venv packages are needed.
 
+    **But the running menu-bar app is the FROZEN bundle**, not the source: the launchd agent
+    points at `dist/AthanApp.app/Contents/MacOS/AthanApp`, so source fixes do nothing until
+    the app is rebuilt. And the bundle has the same disease at its root — it was built from
+    that same Tk-less venv, so `find dist/ -name '*tkinter*'` returns **zero** results. The
+    spec *does* list tkinter in `hiddenimports`; PyInstaller can only bundle what it can
+    import, so it warned and shipped a valid-looking .app with no Tk in it.
+
+    `packaging/build_macos_app.sh` now fails fast when the build interpreter has no tkinter,
+    so this cannot ship again. **Rebuilding requires `brew install python-tk@3.14` first.**
+
     **The lesson, and it recurs in this project:** `DEVNULL` on a subprocess you depend on is
     the same defect as `.catch(() => {})` on the service-worker registration (changelog 17) —
-    a whole subsystem failing in total silence.
+    a whole subsystem failing in total silence. A build warning nobody reads is the third form
+    of it.
 
 ## 8. Possible future ideas (not requested yet)
 
