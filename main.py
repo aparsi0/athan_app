@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config.settings import ConfigManager
 from core.prayer_times import PrayerTimesAPI
 from core.scheduler import PrayerScheduler
+from core.quran_player import QuranPlayer
 from core.audio_player import PrayerAudioManager
 from core.location_service import LocationService
 from gui.system_tray import SystemTrayManager
@@ -48,6 +49,8 @@ class AthanApp:
         self.prayer_api = None
         self.scheduler = None
         self.audio_manager = None
+        self.quran_player = None
+        self._quran_was_displaced = False
         self.tray_manager = None
         self.location_service = None
         
@@ -78,6 +81,17 @@ class AthanApp:
             self.audio_manager = PrayerAudioManager(self.config_manager)
             logger.info("Audio manager initialized")
             
+            # Quran player — a SECOND VLC player, deliberately separate from the
+            # athan one, so prayer audio can interrupt without destroying the
+            # Quran's position.
+            self.quran_player = QuranPlayer(self.config_manager)
+            if self.quran_player.available:
+                logger.info("Quran player ready (%d reciters)", len(self.quran_player.reciters))
+            else:
+                logger.warning("Quran player unavailable; the morning Quran will not run")
+            # Fires when a whole athan chain (athan + duaa) has finished.
+            self.audio_manager.on_chain_finished = self._on_audio_chain_finished
+
             # Prayer scheduler
             self.scheduler = PrayerScheduler(
                 self._on_prayer_time,
@@ -192,6 +206,11 @@ class AthanApp:
                     f"It's time for {prayer_name.title()} prayer"
                 )
             
+            # Prayer audio always wins. suspend() remembers, so the Quran can
+            # be handed back once the chain finishes — unlike stop(), which
+            # forgets. That distinction is what the web app got wrong first.
+            self._suspend_quran_for_prayer()
+
             # Play audio
             if self.audio_manager:
                 success = self.audio_manager.play_prayer_call(prayer_name)
@@ -210,6 +229,12 @@ class AthanApp:
         """Handle scheduled custom audio events."""
         try:
             logger.info("Scheduled custom audio event fired: %s", event_name)
+
+            if event_name == 'morning_quran_end':
+                self._stop_morning_quran()
+                return
+
+            self._suspend_quran_for_prayer()
             if self.audio_manager:
                 audio_key = event_name.split(':', 1)[0]
                 success = self.audio_manager.play_named_audio(audio_key)
@@ -230,6 +255,79 @@ class AthanApp:
         except Exception as exc:
             logger.error("Error handling custom audio event %s: %s", event_name, exc)
     
+    # ----- morning Quran ---------------------------------------------------
+
+    def _suspend_quran_for_prayer(self):
+        """Pause the Quran so prayer audio has the floor, remembering that it
+        was playing so the chain's end can resume it."""
+        if self.quran_player and self.quran_player.is_playing:
+            self.quran_player.suspend()
+
+    def _on_audio_chain_finished(self):
+        """Every athan/reminder chain ends here. Two jobs: resume a Quran that
+        prayer audio interrupted, and — after Fajr specifically — open the
+        morning window, which is why 'right after Fajr' hangs off this rather
+        than off a clock time."""
+        try:
+            if not self.quran_player:
+                return
+            if self.quran_player.resume():
+                logger.info("Prayer audio finished — resuming the Quran")
+                return
+            self._start_morning_quran('the prayer audio chain finished')
+        except Exception as exc:
+            logger.error("Error after audio chain finished: %s", exc)
+
+    def _start_morning_quran(self, why: str) -> bool:
+        """Start the morning Quran if we are inside today's window.
+
+        Safe to call repeatedly: it never restarts something already playing,
+        and never plays over prayer audio.
+        """
+        try:
+            if not (self.quran_player and self.quran_player.available):
+                return False
+            cfg = self.config_manager.get('special_audio_settings.morning_quran', {}) or {}
+            if not cfg.get('enabled', False):
+                return False
+            if not (self.scheduler and self.scheduler.in_morning_quran_window()):
+                return False
+            if self.quran_player.is_playing:
+                return False
+            # PrayerAudioManager has no is_playing of its own; the underlying
+            # AudioPlayer does, and that is what actually holds the floor.
+            player = getattr(self.audio_manager, 'audio_player', None)
+            if player is not None and getattr(player, 'is_playing', False):
+                return False        # prayer audio still has the floor
+
+            wanted = cfg.get('reciter_id')
+            if wanted:
+                self.quran_player.select_reciter(wanted)
+            window = getattr(self.scheduler, 'morning_quran_window', None) or {}
+            logger.info(
+                "🕌 Morning Quran — %s until %s (%s)",
+                self.quran_player.active().get('sheikh', ''),
+                window.get('end', '?'), why,
+            )
+            self._quran_was_displaced = True
+            return self.quran_player.play()
+        except Exception as exc:
+            logger.error("Could not start the morning Quran: %s", exc)
+            return False
+
+    def _stop_morning_quran(self):
+        """End of the window. A full stop, not a pause — nothing should bring
+        it back until tomorrow."""
+        try:
+            if not self.quran_player:
+                return
+            if self.quran_player.is_playing or self.quran_player.suspended:
+                self.quran_player.stop()
+                logger.info("🕌 Morning Quran window has ended")
+            self._quran_was_displaced = False
+        except Exception as exc:
+            logger.error("Could not stop the morning Quran: %s", exc)
+
     def _update_tray_tooltip(self):
         """Update system tray tooltip with next prayer info"""
         try:

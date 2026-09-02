@@ -403,6 +403,12 @@ class PrayerAudioManager:
         if not file_path:
             return ''
 
+        # Network streams are already fully resolved — VLC opens them directly.
+        # Without this a URL falls through to the filename matching below, which
+        # would hunt the local audio folders for "001.mp3" and never find it.
+        if file_path.startswith(('http://', 'https://')):
+            return file_path
+
         if os.path.isabs(file_path):
             return file_path
 
@@ -434,6 +440,12 @@ class PrayerAudioManager:
         """Continue any queued audio after the current track finishes."""
         with self.queue_lock:
             if not self.pending_audio_queue:
+                # Nothing queued: the whole chain (athan, then its duaa) is
+                # finished. That is the moment the morning Quran waits for —
+                # "right after Fajr" is an outcome, not a clock time.
+                callback = getattr(self, 'on_chain_finished', None)
+                if callable(callback):
+                    threading.Thread(target=callback, daemon=True).start()
                 return
 
             next_item = self.pending_audio_queue.pop(0)
@@ -441,7 +453,7 @@ class PrayerAudioManager:
         next_file = next_item['file_path']
         next_volume = next_item.get('volume')
 
-        if os.path.exists(next_file):
+        if next_file.startswith(('http://', 'https://')) or os.path.exists(next_file):
             logger.info("Queueing next audio start: %s", os.path.basename(next_file))
             threading.Thread(
                 target=self._play_queued_audio,
@@ -473,7 +485,8 @@ class PrayerAudioManager:
                     file_path = file_spec
                     volume = None
 
-                if file_path and os.path.exists(file_path):
+                is_stream = bool(file_path) and file_path.startswith(('http://', 'https://'))
+                if file_path and (is_stream or os.path.exists(file_path)):
                     self.pending_audio_queue.append({
                         'file_path': file_path,
                         'volume': volume,

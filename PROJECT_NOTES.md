@@ -40,7 +40,7 @@ SSH is the durable alternative (`git remote set-url origin git@github.com:aparsi
 and bypasses the Keychain, token scopes and the Claude GitHub App entirely.
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v29**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v30**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -81,7 +81,7 @@ athan_app/
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
     ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (349 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v29                    (104 lines)
+    ├── sw.js                  service worker — cache version v30                    (104 lines)
     ├── README.md              web-app-specific readme
     ├── css/style.css          full site styling, responsive, RTL Arabic support     (382 lines)
     ├── js/
@@ -429,6 +429,32 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     the same defect as `.catch(() => {})` on the service-worker registration (changelog 17) —
     a whole subsystem failing in total silence. A build warning nobody reads is the third form
     of it.
+
+25. **Morning Quran on the desktop app (2026-09-02).** Full parity with the web version:
+    four reciters, endless rotation, the morning window, athan priority, position remembered.
+
+    **`docs/assets/reciters.json` is now the single source of truth** for the reciter table and
+    the 114 surah names. `docs/js/reciters.js` fetches it; `core/quran_player.py` reads the same
+    file off disk. Adding a reciter is one edit — plus its host in `media-src`, which only the
+    web app needs. The JS fills `SURAH_NAMES`/`RECITERS` **in place** rather than reassigning,
+    because `audio-players.js` captures `SURAH_NAMES` by reference at load time for
+    المصحف المعلم; `app.js` loads the JSON once, then builds every player.
+
+    Three things the desktop needed that the web did not:
+    - **A second VLC player.** `AudioPlayer.media_player` is stopped and reused for every athan,
+      duaa and azkar, so sharing it would destroy the Quran's position each time. `QuranPlayer`
+      owns its own `vlc.Instance` and player, which can be paused and resumed while prayer audio
+      holds the floor.
+    - **URLs through the file layer.** `_resolve_audio_file_path` treated everything as a local
+      path — a URL fell through to filename matching and hunted the audio folders for
+      "001.mp3". Streams now short-circuit, in the resolver and in the playback queue.
+    - **A "whole chain finished" signal.** "Right after Fajr" is an outcome, not a clock time.
+      `AudioPlayer.on_chain_finished` fires when the queue drains — i.e. after the athan AND
+      its duaa — and that is what opens the window and what resumes a suspended Quran.
+
+    The window end is a scheduled event at Azkar + N; the start is the Fajr chain finishing.
+    Verified to match the web app's computation exactly: Sep 02 05:35–10:14, Dec 21 06:05–09:13,
+    Jun 21 04:31–10:17.
 
 ## 8. Possible future ideas (not requested yet)
 

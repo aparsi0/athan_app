@@ -634,7 +634,70 @@ class DashboardWindow:
         self._build_prayer_section(body)
         self._build_audio_volume_section(body)
         self._build_special_audio_section(body)
+        self._build_morning_quran_section(body)
         self._build_settings_actions(body)
+
+    def _build_morning_quran_section(self, parent: tk.Frame):
+        """Morning Quran: reciter, on/off, and how long past the Azkar it runs."""
+        section = self._section_box(parent, "Morning Quran")
+        cfg = (self.config.get("special_audio_settings", {}) or {}).get("morning_quran", {}) or {}
+
+        enabled_var = tk.BooleanVar(value=bool(cfg.get("enabled", True)))
+        self.settings_vars["special_audio_settings.morning_quran.enabled"] = enabled_var
+        tk.Checkbutton(
+            section,
+            text="Play Quran through the morning",
+            variable=enabled_var,
+            bg=PALETTE["card_alt"], fg=PALETTE["text_dark"],
+            activebackground=PALETTE["card_alt"], activeforeground=PALETTE["text_dark"],
+            selectcolor=PALETTE["card"],
+            font=("SF Pro Text", 11, "bold"), anchor="w",
+        ).pack(fill="x", pady=(0, 6))
+
+        # Reciter choice comes from the SAME reciters.json the web app reads.
+        try:
+            from core.quran_player import load_reciters
+            _names, reciters = load_reciters()
+        except Exception:
+            reciters = []
+        labels = [f"{r.get('sheikh','')} — {r.get('mushaf','')}" for r in reciters]
+        ids = [r.get("id") for r in reciters]
+        current_id = cfg.get("reciter_id") or (ids[0] if ids else "")
+        current_label = labels[ids.index(current_id)] if current_id in ids else (labels[0] if labels else "")
+
+        row = tk.Frame(section, bg=PALETTE["card_alt"])
+        row.pack(fill="x", pady=3)
+        tk.Label(
+            row, text="Reciter", bg=PALETTE["card_alt"], fg=PALETTE["text_dark"],
+            font=("SF Pro Text", 11), width=22, anchor="w",
+        ).pack(side="left")
+        reciter_var = tk.StringVar(value=current_label)
+        if labels:
+            ttk.OptionMenu(row, reciter_var, current_label, *labels).pack(side="left")
+        else:
+            tk.Label(
+                row, text="reciters.json not found", bg=PALETTE["card_alt"],
+                fg=PALETTE["warn"], font=("SF Pro Text", 11),
+            ).pack(side="left")
+        self.settings_vars["special_audio_settings.morning_quran.reciter_id"] = (
+            reciter_var, dict(zip(labels, ids))
+        )
+
+        self._labeled_entry(
+            section,
+            "special_audio_settings.morning_quran.end_after_azkar_minutes",
+            "Stop N min after Azkar",
+            str(cfg.get("end_after_azkar_minutes", 60)),
+        )
+
+        tk.Label(
+            section,
+            text=("Starts when the Fajr athan and its duaa finish, and runs until the time above.\n"
+                  "Both ends move with the prayer times, so this is never a fixed hour. The Azkar\n"
+                  "falls inside the window and still takes priority — the Quran pauses and resumes."),
+            bg=PALETTE["card_alt"], fg=PALETTE["muted"],
+            font=("SF Pro Text", 10), justify="left", anchor="w",
+        ).pack(fill="x", pady=(6, 0))
 
     def _build_location_section(self, parent: tk.Frame):
         section = self._section_box(parent, "Location")
@@ -1107,6 +1170,17 @@ class DashboardWindow:
                 _set_int(f"{base}.lead_minutes", self.settings_vars[f"{base}.lead_minutes"].get())
             elif event in ("friday_before_dhuhr", "morning_audio", "night_audio"):
                 _set_int(f"{base}.offset_minutes", self.settings_vars[f"{base}.offset_minutes"].get())
+
+        # Morning Quran
+        mq = "special_audio_settings.morning_quran"
+        if f"{mq}.enabled" in self.settings_vars:
+            cm.set(f"{mq}.enabled", bool(self.settings_vars[f"{mq}.enabled"].get()))
+            reciter_var, label_to_id = self.settings_vars[f"{mq}.reciter_id"]
+            chosen = label_to_id.get(reciter_var.get())
+            if chosen:
+                cm.set(f"{mq}.reciter_id", chosen)
+            _set_int(f"{mq}.end_after_azkar_minutes",
+                     self.settings_vars[f"{mq}.end_after_azkar_minutes"].get())
 
         return errors
 
