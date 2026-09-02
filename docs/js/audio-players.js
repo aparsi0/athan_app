@@ -1,13 +1,14 @@
 /**
- * Two extra Quran tabs, both plain HTML5 <audio> (no YouTube iframe):
+ * The shared Quran audio engine, plus two of the three players built on it:
  *
  *   Moalem      — المصحف المعلم, Sheikh Mahmoud Khalil Al-Hosary.
  *                 114 surahs in order, direct MP3s from el-hosary.com.
  *   QuranRadio  — إذاعة القرآن الكريم من القاهرة, live 24/7 stream.
  *
- * Both mirror the Podcast API (pause / maybeResume / cancelResume) so the
- * athan pipeline can give prayer audio priority, and all three players are
- * mutually exclusive — starting one silences the others.
+ * The third, the reciter-selector Quran tab, lives in reciters.js and uses
+ * makeAudioPlayer() from here. Every player exposes pause / maybeResume /
+ * cancelResume so the athan pipeline can give prayer audio priority, and all
+ * of them register in QuranPlayers so only one can sound at a time.
  */
 
 /** Every Quran-ish player registers here so only one can sound at a time. */
@@ -17,10 +18,6 @@ const QuranPlayers = {
   silenceOthers(except) {
     for (const p of this.all) {
       if (p !== except && typeof p.stopForOther === 'function') p.stopForOther();
-    }
-    if (except !== 'podcast' && typeof Podcast !== 'undefined') {
-      Podcast.pause();
-      Podcast.cancelResume();
     }
   },
   pauseAll() { for (const p of this.all) p.pause(); },
@@ -47,16 +44,7 @@ function makeAudioPlayer(opts) {
       this.playBtn = el(opts.ids.play);
 
       if (opts.tracks) {
-        const ol = el(opts.ids.list);
-        if (ol && !ol.childElementCount) {
-          opts.tracks.forEach((name, i) => {
-            const li = document.createElement('li');
-            li.dataset.i = i;
-            li.innerHTML = `<span class="snum">${i + 1}</span><span class="sname">سورة ${name}</span>`;
-            li.addEventListener('click', () => this.play(i, true));
-            ol.appendChild(li);
-          });
-        }
+        this._renderList();
         el(opts.ids.prev).addEventListener('click', () => {
           if (this.idx != null && this.idx > 0) this.play(this.idx - 1, true);
         });
@@ -120,7 +108,12 @@ function makeAudioPlayer(opts) {
         this._setPlaying(false);
         if (!opts.tracks) { this._reconnect(); return; }
         const next = (this.idx + 1) % opts.tracks.length;
-        if (next === 0) App.logStatus(`${opts.icon} ${opts.name} — finished سورة الناس, starting again from الفاتحة.`);
+        if (next === 0) {
+          // Mushaf finished. A player that knows what comes next (the reciter
+          // rotation) takes over; otherwise loop this list as before.
+          if (typeof opts.onPlaylistEnd === 'function') { opts.onPlaylistEnd(); return; }
+          App.logStatus(`${opts.icon} ${opts.name} — finished سورة الناس, starting again from الفاتحة.`);
+        }
         this.play(next);
       });
       this.audio.addEventListener('error', () => this._onError());
@@ -164,6 +157,7 @@ function makeAudioPlayer(opts) {
 
       if (opts.tracks) {
         this.idx = i;
+        opts.onTrackChange?.(i);
         this.audio.src = opts.srcFor(i, this._srcTry);
         document.getElementById(opts.ids.title).textContent = `سورة ${opts.tracks[i]}`;
         document.getElementById(opts.ids.sub).textContent = `${i + 1} / ${opts.tracks.length} · ${opts.reciter}`;
@@ -325,6 +319,31 @@ function makeAudioPlayer(opts) {
       this.audio.play().catch(() => {});
     },
 
+    /** (Re)draw the surah list from opts.tracks. */
+    _renderList() {
+      const ol = document.getElementById(opts.ids.list);
+      if (!ol) return;
+      ol.innerHTML = '';
+      opts.tracks.forEach((name, i) => {
+        const li = document.createElement('li');
+        li.dataset.i = i;
+        li.innerHTML = `<span class="snum">${i + 1}</span><span class="sname">سورة ${name}</span>`;
+        li.addEventListener('click', () => this.play(i, true));
+        ol.appendChild(li);
+      });
+    },
+
+    /** Swap the whole track list (a different reciter, a different mushaf).
+     *  Playback position is meaningless across lists, so it is reset. */
+    setTracks(tracks) {
+      opts.tracks = tracks;
+      this.idx = null;
+      this._renderList();
+      this._resetSeek?.();
+      const t = document.getElementById(opts.ids.title);
+      if (t) t.textContent = 'اختر سورة من القائمة';
+    },
+
     _nudge() {
       if (this._shouldBePlaying) this.audio.play().catch(() => {});
     },
@@ -335,7 +354,7 @@ function makeAudioPlayer(opts) {
      * happening against what actually is, and recover.
      */
     _startWatchdog() {
-      if (this._watchdog) return;   // never stack (Podcast and AudioManager both guard)
+      if (this._watchdog) return;   // never stack (AudioManager guards the same way)
       this._watchdog = setInterval(() => this._check(), 6000);
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') this._check();
@@ -384,7 +403,7 @@ const Moalem = makeAudioPlayer({
   name: 'Al-Mos\'haf Al-Moa\'alem',
   icon: '📖',
   reciter: 'الشيخ محمود خليل الحصري',
-  tracks: PODCAST.surahs,
+  tracks: SURAH_NAMES,
   volumeKey: 'audio_settings.moalem_volume',
   // Ordered source list. Only one host today; adding a mirror is one line
   // here plus its host in the index.html `media-src` CSP directive, and the

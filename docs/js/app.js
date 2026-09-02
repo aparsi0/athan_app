@@ -138,6 +138,15 @@ const App = {
   // ---------- scheduled events ----------
 
   async handleEvent(event) {
+    if (event.kind === 'morning_quran_end') {
+      if (Reciters.player?.playing || Reciters.player?._shouldBePlaying) {
+        Reciters.player.pause();
+        Reciters.player.cancelResume();
+        this.logStatus('🕌 Morning Quran window has ended.');
+      }
+      return;
+    }
+
     if (event.kind === 'refresh') {
       this.logStatus('Midnight — refreshing prayer times for the new day…');
       await this.loadPrayerTimes();
@@ -163,8 +172,7 @@ const App = {
 
     this.logStatus(`▶ ${event.label} — ${this.fmtTime(event.time)}`);
     this.notify(event.label);
-    Podcast.pause();          // prayer audio takes priority over every Quran player
-    QuranPlayers.pauseAll();
+    QuranPlayers.pauseAll();  // prayer audio takes priority over every Quran player
 
     if (event.kind === 'athan') {
       const files = Config.get('audio_settings.athan_files', {});
@@ -177,8 +185,10 @@ const App = {
         this.logStatus(`▶ After-prayer Duaa (${PRAYER_LABELS[event.prayer].en})`);
         await AudioManager.play(duaa.audio_file, duaa.volume, 'After-prayer Duaa');
       }
-      Podcast.maybeResume(); // Quran continues where it was interrupted
-      QuranPlayers.resumeAll();
+      QuranPlayers.resumeAll(); // Quran continues where it was interrupted
+      // The morning Quran starts the moment the Fajr chain is done, not at a
+      // clock time — "right after Fajr" means after the athan AND its duaa.
+      if (event.prayer === 'fajr') this.startMorningQuran('the Fajr athan finished');
       this.renderSchedule();
       return;
     }
@@ -188,9 +198,29 @@ const App = {
     if (cfg.audio_file) {
       await AudioManager.play(cfg.audio_file, cfg.volume, event.label);
     }
-    Podcast.maybeResume(); // Quran continues where it was interrupted
-    QuranPlayers.resumeAll();
+    QuranPlayers.resumeAll(); // Quran continues where it was interrupted
     this.renderSchedule();
+  },
+
+  /** Start (or resume) the morning Quran, if it is enabled and we are inside
+   *  today's window. Safe to call repeatedly — it never restarts a player
+   *  that is already going, and never plays over prayer audio. */
+  startMorningQuran(why) {
+    const cfg = Config.get('special_audio_settings.morning_quran', {});
+    if (!cfg.enabled) return;
+    if (typeof Reciters === 'undefined' || !Reciters.player) return;
+    if (!Scheduler.inMorningWindow()) return;
+    if (AudioManager.isPlaying()) return;          // athan/azkar always wins
+    if (Reciters.player.playing) return;           // already running
+
+    if (cfg.reciter_id) Reciters.selectById(cfg.reciter_id);
+    const sheikh = Reciters.active().sheikh;
+    const until = Scheduler.morningWindow ? this.fmtTime(Scheduler.morningWindow.end) : '';
+    this.logStatus(`🕌 Morning Quran — ${sheikh}${until ? ` until ${until}` : ''} (${why}).`);
+    // Resume where this device left off rather than always restarting at
+    // الفاتحة, so a reload mid-morning picks up the surah that was playing.
+    const at = Number(Config.get('audio_settings.morning_quran_index', 0)) || 0;
+    Reciters.player.play(at);
   },
 
   notify(body) {
@@ -329,7 +359,10 @@ const App = {
 
     document.getElementById('locateBtn').addEventListener('click', () => this.useMyLocation(false));
 
-    Podcast.init();
+    Reciters.init();
+    // A page opened or reloaded mid-morning should carry on, not sit silent.
+    // Deferred so prayer times (and therefore the window) are known first.
+    setTimeout(() => this.startMorningQuran('page opened during the morning window'), 4000);
     Moalem.init();
     QuranRadio.init();
 
@@ -338,11 +371,7 @@ const App = {
 
     document.getElementById('stopBtn').addEventListener('click', () => {
       AudioManager.stop();
-      // Stop the YouTube player explicitly. It is deliberately NOT in the
-      // QuranPlayers registry (silenceOthers drives it by name), so
-      // pauseAll() below does not reach it.
-      Podcast.pause();
-      Podcast.cancelResume(); // user asked for silence — don't auto-resume the Quran
+      // Every Quran player is in the registry now, so this reaches all of them.
       QuranPlayers.pauseAll();
       QuranPlayers.cancelAll();
       this.logStatus('Playback stopped.');
@@ -404,10 +433,9 @@ const App = {
 
     await AudioManager.unlock();
     AudioManager.startKeepAlive();
-    Podcast.pause();
     QuranPlayers.pauseAll();
     AudioManager.play(file, Config.get('audio_settings.athan_volume', 0.8), label)
-      .then(() => { Podcast.maybeResume(); QuranPlayers.resumeAll(); });
+      .then(() => QuranPlayers.resumeAll());
   },
 
   updateTestButton() {
@@ -435,6 +463,15 @@ const App = {
       document.getElementById(`sp_${key}`).checked = !!Config.get(`special_audio_settings.${key}.enabled`, true);
       document.getElementById(`vol_${key}`).value = Config.get(`special_audio_settings.${key}.volume`, 0.8);
     }
+
+    // Morning Quran
+    const mq = Config.get('special_audio_settings.morning_quran', {});
+    document.getElementById('sp_morning_quran').checked = mq.enabled !== false;
+    document.getElementById('mq_end').value = mq.end_after_azkar_minutes ?? 60;
+    const mqSel = document.getElementById('mq_reciter');
+    mqSel.innerHTML = RECITERS.map((r) =>
+      `<option value="${r.id}">${r.sheikh} — ${r.mushaf}</option>`).join('');
+    mqSel.value = mq.reciter_id || RECITERS[0].id;
     document.getElementById('woduaaLead').value = Config.get('special_audio_settings.pre_prayer_woduaa.lead_minutes', 15);
 
     // Location
@@ -455,6 +492,14 @@ const App = {
       Config.set(`special_audio_settings.${key}.enabled`, document.getElementById(`sp_${key}`).checked);
       Config.set(`special_audio_settings.${key}.volume`, Number(document.getElementById(`vol_${key}`).value));
     }
+
+    Config.set('special_audio_settings.morning_quran.enabled',
+      document.getElementById('sp_morning_quran').checked);
+    Config.set('special_audio_settings.morning_quran.reciter_id',
+      document.getElementById('mq_reciter').value);
+    const mqEndRaw = Number(document.getElementById('mq_end').value);
+    Config.set('special_audio_settings.morning_quran.end_after_azkar_minutes',
+      Number.isFinite(mqEndRaw) && mqEndRaw >= 0 ? Math.min(mqEndRaw, 240) : 60);
     // The field is min=1 max=120, but an EMPTY input gives Number('') === 0,
     // which would schedule the reminder at the exact prayer minute (where the
     // scheduler now drops it) and silently remove all five woduaa reminders.

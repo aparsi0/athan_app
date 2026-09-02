@@ -101,6 +101,30 @@ const Scheduler = {
       this.events.push({ name: eventName, kind: eventName, time: at, label: labels[eventName] });
     }
 
+    // Morning Quran window: [Fajr, Morning Azkar + N minutes]. Its START is
+    // not a scheduled event — playback begins when the Fajr athan chain
+    // actually finishes — but the END is, so it can be stopped on time.
+    this.morningWindow = null;
+    const mq = Config.get('special_audio_settings.morning_quran', {});
+    const azkar = Config.get('special_audio_settings.morning_audio', {});
+    if (mq.enabled) {
+      const fajrAt = times.fajr ? toDate(times.fajr) : null;
+      const azkarRef = azkar.reference_time || 'dhuhr';
+      const azkarAt = times[azkarRef]
+        ? toDate(times[azkarRef], Number(azkar.offset_minutes || 0)) : null;
+      const endAt = azkarAt
+        ? toDate(times[azkarRef],
+                 Number(azkar.offset_minutes || 0) + Number(mq.end_after_azkar_minutes ?? 60))
+        : null;
+      if (fajrAt && endAt && endAt > fajrAt) {
+        this.morningWindow = { start: fajrAt, end: endAt };
+        this.events.push({
+          name: 'morning_quran_end', kind: 'morning_quran_end',
+          time: endAt, label: 'Morning Quran ends'
+        });
+      }
+    }
+
     this.events.sort((a, b) => a.time - b.time);
     this.onRefresh?.();
   },
@@ -187,6 +211,12 @@ const Scheduler = {
     }
 
     this.lastTick = now;
+  },
+
+  /** Is `when` inside today's morning-Quran window? */
+  inMorningWindow(when = new Date()) {
+    const w = this.morningWindow;
+    return !!w && when >= w.start && when < w.end;
   },
 
   nextPrayer() {

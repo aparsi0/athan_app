@@ -3,7 +3,7 @@
  * and caches audio files the first time they play.
  * Bump CACHE_VERSION when deploying changes to force clients to update.
  */
-const CACHE_VERSION = 'athan-web-v24';
+const CACHE_VERSION = 'athan-web-v25';
 // Entries the app cannot run without. If any of these fail to precache the
 // install must FAIL, so the previous worker stays in control with its intact
 // cache and the install is retried on the next load. Swallowing every error
@@ -12,7 +12,7 @@ const CACHE_VERSION = 'athan-web-v24';
 const CRITICAL = new Set([
   '.', 'index.html', 'css/style.css',
   'js/config.js', 'js/location.js', 'js/prayer-times.js', 'js/audio.js',
-  'js/scene.js', 'js/podcast.js', 'js/audio-players.js', 'js/scheduler.js', 'js/app.js'
+  'js/scene.js', 'js/reciters.js', 'js/audio-players.js', 'js/scheduler.js', 'js/app.js'
 ]);
 const APP_SHELL = [
   '.',
@@ -23,7 +23,7 @@ const APP_SHELL = [
   'js/prayer-times.js',
   'js/audio.js',
   'js/scene.js',
-  'js/podcast.js',
+  'js/reciters.js',
   'js/audio-players.js',
   'js/scheduler.js',
   'js/app.js',

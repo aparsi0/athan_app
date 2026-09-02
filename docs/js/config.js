@@ -22,6 +22,7 @@ const DEFAULT_CONFIG = {
   audio_settings: {
     athan_volume: 0.8,
     quran_volume: 0.8,
+    reciter_id: 'refat',        // remembered choice in the Quran tab
     audio_file: 'assets/audio/Azansoundtrack.m4a',
     athan_files: {
       fajr: 'assets/audio/fajr_athan.m4a',
@@ -57,6 +58,15 @@ const DEFAULT_CONFIG = {
       offset_minutes: -240,
       audio_file: 'assets/audio/morning_audio.m4a',
       volume: 0.8
+    },
+    // Quran plays on its own through the morning: from the moment the Fajr
+    // athan (and its duaa) finish, until `end_after_azkar_minutes` past the
+    // Morning Azkar above. The Azkar fall inside that window and take
+    // priority as usual — the Quran pauses for them and resumes after.
+    morning_quran: {
+      enabled: true,
+      reciter_id: 'refat',
+      end_after_azkar_minutes: 60
     },
     night_audio: {
       enabled: true,
