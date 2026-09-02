@@ -257,9 +257,18 @@ const App = {
     Reciters.selectById(wanted);
     const at = sameReciter ? saved : 0;
 
+    // Remember what we are about to displace, so the window can hand it back.
+    // This has to happen BEFORE play(), because play() runs silenceOthers(),
+    // whose stopForOther() deliberately clears each player's _resumeWanted —
+    // that is the difference between "stop" and "pause", and why the radio
+    // never came back on its own.
+    this._morningDisplaced = QuranPlayers.all.filter((p) =>
+      p !== Reciters.player && (p.playing || p._shouldBePlaying || p._resumeWanted));
+
     const sheikh = Reciters.active().sheikh;
     const until = Scheduler.morningWindow ? this.fmtTime(Scheduler.morningWindow.end) : '';
-    this.logStatus(`🕌 Morning Quran — ${sheikh}${until ? ` until ${until}` : ''} (${why}).`);
+    const handBack = this._morningDisplaced.length ? ' — will hand back afterwards' : '';
+    this.logStatus(`🕌 Morning Quran — ${sheikh}${until ? ` until ${until}` : ''}${handBack} (${why}).`);
     Reciters.player.play(at);   // silences every other Quran player
   },
 
@@ -274,6 +283,24 @@ const App = {
     Reciters.player.pause();
     Reciters.player.cancelResume();
     if (wasOn) this.logStatus('🕌 Morning Quran window has ended.');
+
+    const displaced = this._morningDisplaced || [];
+    this._morningDisplaced = null;
+    // Only hand back if the morning Quran was still the thing playing. If the
+    // visitor took manual control during the window — started المصحف المعلم at
+    // 08:00, say — restoring the radio over it would be exactly the kind of
+    // override this whole change exists to prevent.
+    if (!wasOn || !displaced.length) return;
+    for (const player of displaced) {
+      // Arm it and let each player resume the way it knows how: a track player
+      // picks up mid-surah (its src and position were only paused, never
+      // cleared), while the live radio rejoins at the live edge.
+      player._resumeWanted = true;
+      player.maybeResume();
+      // maybeResume() declines while prayer audio is playing and leaves
+      // _resumeWanted set, so the athan's own resumeAll() picks it up later.
+    }
+    this.logStatus('▶ Resuming what was playing before the morning Quran.');
   },
 
   notify(body) {
