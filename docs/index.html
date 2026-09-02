@@ -7,12 +7,15 @@
        run injected script. Scoped to exactly what the app needs:
          script/frame  → YouTube player (iframe_api + s.ytimg.com)
          connect       → the prayer-time & geolocation APIs
-         worker blob:  → the background-clock Web Worker (scheduler.js) — MUST
-                         stay, or the athan scheduler breaks in background tabs
+         worker        → 'self' for the service worker (sw.js) AND blob: for the
+                         background-clock Web Worker (scheduler.js). BOTH are
+                         required: worker-src governs service workers too, and
+                         omitting 'self' silently blocks sw.js registration —
+                         which disables offline support and PWA install.
          style inline  → the handful of inline style attributes in this file
        No 'unsafe-inline'/'unsafe-eval' for scripts: the app has no inline
        scripts or event handlers, so script injection is fully blocked. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://api.aladhan.com https://api.bigdatacloud.net https://ipapi.co https://ipwho.is https://www.youtube.com; img-src 'self' data: https://i.ytimg.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; media-src 'self' https://www.el-hosary.com https://el-hosary.com https://radio.garden https://*.radiojar.com; worker-src blob:; child-src blob: https://www.youtube.com; object-src 'none'; base-uri 'self'; manifest-src 'self'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://api.aladhan.com https://api.bigdatacloud.net https://ipapi.co https://ipwho.is https://www.youtube.com; img-src 'self' data: https://i.ytimg.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; media-src 'self' https://www.el-hosary.com https://el-hosary.com https://radio.garden https://*.radiojar.com; worker-src 'self' blob:; child-src 'self' blob: https://www.youtube.com; object-src 'none'; base-uri 'self'; manifest-src 'self'; form-action 'none'" />
   <!-- Audio now streams from third-party hosts; don't hand them the page URL. -->
   <meta name="referrer" content="no-referrer" />
   <title>Athan Web — Prayer Times & Automatic Athan</title>

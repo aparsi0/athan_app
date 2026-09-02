@@ -3,7 +3,7 @@
  * and caches audio files the first time they play.
  * Bump CACHE_VERSION when deploying changes to force clients to update.
  */
-const CACHE_VERSION = 'athan-web-v23';
+const CACHE_VERSION = 'athan-web-v24';
 const APP_SHELL = [
   '.',
   'index.html',
@@ -22,8 +22,18 @@ const APP_SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
+  // Precache file-by-file rather than with cache.addAll(): addAll() is
+  // all-or-nothing, so a single 404 (or one asset briefly unavailable on a
+  // fresh deploy) would reject, abort the install and leave the site with no
+  // service worker at all. allSettled() keeps whatever succeeded.
+  // {cache: 'reload'} bypasses the browser's own HTTP cache — GitHub Pages
+  // serves max-age=600, so without it a bump can precache the OLD files under
+  // the NEW cache name, and activate() then deletes the only other copy.
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE_VERSION).then((cache) => Promise.allSettled(
+      APP_SHELL.map((url) => cache.add(new Request(url, { cache: 'reload' }))
+        .catch((e) => { console.warn('[sw] precache miss:', url, e.message); }))
+    )).then(() => self.skipWaiting())
   );
 });
 
@@ -46,7 +56,7 @@ self.addEventListener('fetch', (event) => {
   // visitors don't pre-download all five theme photos.
   if (url.pathname.includes('/assets/')) {
     event.respondWith(
-      caches.match(event.request).then(
+      caches.match(event.request, { ignoreSearch: true }).then(
         (hit) => hit || fetch(event.request).then((res) => {
           if (res.ok && res.status !== 206) {
             const copy = res.clone();
@@ -70,6 +80,12 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request, { ignoreSearch: true })
+        // A navigation that misses (e.g. the URL carried ?utm_source=…) must
+        // still get the shell. Resolving undefined here would hand the user
+        // the browser's offline error page while the shell sits in the cache.
+        .then((hit) => hit || (event.request.mode === 'navigate'
+          ? caches.match('index.html', { ignoreSearch: true })
+          : undefined)))
   );
 });
