@@ -69,20 +69,36 @@ const Podcast = {
       const li = document.createElement('li');
       li.dataset.i = i;
       li.innerHTML = `<span class="snum">${i + 1}</span><span class="sname">سورة ${name}</span>`;
-      li.addEventListener('click', () => this.play(i));
+      li.addEventListener('click', () => this.play(i, true));
       ol.appendChild(li);
     });
     document.getElementById('playBtn').addEventListener('click', () => {
-      if (this.idx == null) { this.play(0); return; }
+      if (this.idx == null) { this.play(0, true); return; }
       if (!this.ready) return;
-      if (this.playing) { this._shouldBePlaying = false; this.player.pauseVideo(); }
-      else { this._shouldBePlaying = true; this.player.playVideo(); }
+      if (this.playing) {
+        this._shouldBePlaying = false;
+        this._resumeWanted = false;   // a manual pause withdraws auto-resume consent
+        this.player.pauseVideo();
+      } else {
+        // Athan priority — play() checks this but the toggle never did, so
+        // tapping ▶ during a prayer played the Quran over the athan.
+        if (AudioManager.isPlaying()) {
+          App.logStatus('⚠️ Prayer audio is playing — the Quran will not interrupt it.');
+          return;
+        }
+        // Resuming here also has to silence the other two tabs; only the
+        // this.idx == null branch went through play(), which does that.
+        if (typeof QuranPlayers !== 'undefined') QuranPlayers.silenceOthers('podcast');
+        this._shouldBePlaying = true;
+        this._consecErrors = 0;
+        this.player.playVideo();
+      }
     });
     document.getElementById('prevBtn').addEventListener('click', () => {
-      if (this.idx != null && this.idx > 0) this.play(this.idx - 1);
+      if (this.idx != null && this.idx > 0) this.play(this.idx - 1, true);
     });
     document.getElementById('nextBtn').addEventListener('click', () => {
-      if (this.idx != null && this.idx < PODCAST.videoIds.length - 1) this.play(this.idx + 1);
+      if (this.idx != null && this.idx < PODCAST.videoIds.length - 1) this.play(this.idx + 1, true);
     });
     document.getElementById('ytThumb').addEventListener('click', () =>
       document.getElementById('ytThumb').classList.toggle('expanded'));
@@ -172,7 +188,12 @@ const Podcast = {
     }
   },
 
-  play(i) {
+  /** Start surah `i`. `userInitiated` marks a real click, which forgives an
+   *  earlier failure streak — auto-advance and error recovery must NOT, or a
+   *  dead host walks all 114 surahs forever. (Same contract as
+   *  makeAudioPlayer.play in audio-players.js; this file was missed when that
+   *  bug was fixed there.) */
+  play(i, userInitiated) {
     // Athan takes priority: don't interrupt a live athan/duaa broadcast.
     if (AudioManager.isPlaying()) {
       App.logStatus('⚠️ Prayer audio is playing — the Quran will not interrupt it.');
@@ -182,7 +203,8 @@ const Podcast = {
     if (typeof QuranPlayers !== 'undefined') QuranPlayers.silenceOthers('podcast');
     this._resumeWanted = false; // manual start supersedes any pending auto-resume
     this._shouldBePlaying = true;
-    this._consecErrors = 0;
+    this._suppressPending = false;
+    if (userInitiated) this._consecErrors = 0;
     // Reset stall-tracking for the new surah — otherwise a stale currentTime
     // left over from whatever was playing before could make the watchdog
     // misjudge this fresh video as already "stuck".
@@ -223,8 +245,17 @@ const Podcast = {
             this.ready = true;
             this._applyVolume();
             if (this._pendingIdx != null) {
-              this.player.loadVideoById(PODCAST.videoIds[this._pendingIdx]);
+              const pending = this._pendingIdx;
               this._pendingIdx = null;
+              // The iframe can take seconds to come up. If an athan started in
+              // the meantime, do not autoplay over it — remember to resume.
+              if (this._suppressPending || AudioManager.isPlaying()) {
+                this._suppressPending = false;
+                this._resumeWanted = true;
+                try { this.player.pauseVideo(); } catch { /* not up yet */ }
+              } else {
+                this.player.loadVideoById(PODCAST.videoIds[pending]);
+              }
             }
           },
           onStateChange: (e) => {
@@ -265,9 +296,14 @@ const Podcast = {
   /** Pause Quran playback (called when prayer audio starts). Remembers that
    *  it was playing so it can resume once the prayer audio finishes. */
   pause() {
+    // These must apply even when the iframe has not finished loading. The
+    // whole body used to sit inside the `ready` guard, so an athan arriving
+    // while the YouTube API was still coming up was a no-op — and onReady
+    // then autoplayed the pending surah straight over the athan.
+    if (this.playing || this._pendingIdx != null) this._resumeWanted = true;
+    this._shouldBePlaying = false; // deliberate pause — the watchdog must not fight it
+    this._suppressPending = true;  // onReady must not autoplay after this
     if (this.ready && this.player?.pauseVideo) {
-      if (this.playing) this._resumeWanted = true;
-      this._shouldBePlaying = false; // deliberate pause — the watchdog must not fight it
       try { this.player.pauseVideo(); } catch { /* player may be gone */ }
     }
   },
@@ -295,6 +331,17 @@ const Podcast = {
   cancelResume() {
     this._resumeWanted = false;
     this._shouldBePlaying = false;
+    this._suppressPending = true;
+    this._pendingIdx = null;
+    // Actually stop. This only cleared flags, and the Stop button calls it
+    // instead of pause() — while Podcast is not in the QuranPlayers registry,
+    // so pauseAll() could not cover for it. Result: Stop logged "Playback
+    // stopped." and the Quran kept playing, and because _shouldBePlaying was
+    // now false the watchdog stopped managing it while ENDED still
+    // auto-advanced it through the rest of the 114.
+    if (this.ready && this.player?.pauseVideo) {
+      try { this.player.pauseVideo(); } catch { /* player may be gone */ }
+    }
   },
 
   /**

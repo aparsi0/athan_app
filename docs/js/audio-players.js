@@ -71,11 +71,28 @@ function makeAudioPlayer(opts) {
         if (!opts.tracks && !this._started) { this.play(0, true); return; }
         if (this.playing) {
           this._shouldBePlaying = false;
+          // Pausing by hand also withdraws consent to be auto-resumed after
+          // the athan; without this the post-duaa resumeAll() restarted a
+          // player the user had deliberately silenced.
+          this._resumeWanted = false;
           this.audio.pause();
         } else {
+          // Athan priority. play() has always checked this, but the toggle
+          // did not — so tapping ▶ during a prayer (the natural reaction to
+          // the Quran going quiet) played straight over the athan.
+          if (AudioManager.isPlaying()) {
+            App.logStatus('⚠️ Prayer audio is playing — the Quran will not interrupt it.');
+            return;
+          }
+          // The element may be in an error state after the give-up guard
+          // fired. play() on a failed element does not re-resolve the source,
+          // so the radio would never advance past the dead edge and would
+          // never regenerate its live cache-buster. Reload properly instead.
+          if (this.audio.error || this._gaveUp) { this.play(this.idx ?? 0, true); return; }
           QuranPlayers.silenceOthers(this);
           this._shouldBePlaying = true;
           this._failStreak = 0;   // pressing play is a fresh start, as above
+          this._stalls = 0;
           this.audio.play().catch(() => {});
         }
       });
@@ -88,7 +105,16 @@ function makeAudioPlayer(opts) {
       });
       this._volEl = vol;
 
-      this.audio.addEventListener('playing', () => { this._failStreak = 0; this._setPlaying(true); });
+      this.audio.addEventListener('playing', () => {
+        this._failStreak = 0;
+        // _stalls was only ever zeroed when it crossed the escalation
+        // threshold, so two brief nudged-through hiccups an hour apart left
+        // the counter at 2 and made the NEXT one-second stutter jump straight
+        // to a full reconnect — bumping the radio off a healthy edge.
+        this._stalls = 0;
+        this._gaveUp = false;
+        this._setPlaying(true);
+      });
       this.audio.addEventListener('pause', () => this._setPlaying(false));
       this.audio.addEventListener('ended', () => {
         this._setPlaying(false);
@@ -130,7 +156,8 @@ function makeAudioPlayer(opts) {
       this._shouldBePlaying = true;
       this._started = true;
       this._srcTry = 0;                       // each new item starts at the primary source
-      if (userInitiated) this._failStreak = 0;
+      if (userInitiated) { this._failStreak = 0; this._gaveUp = false; }
+      this._stalls = 0;
       this._lastTime = null;
       this._lastTimeAt = null;
       this._loadedAt = Date.now();
@@ -270,6 +297,7 @@ function makeAudioPlayer(opts) {
       }
 
       if (this._failStreak >= 5) {
+        this._gaveUp = true;
         App.logStatus(opts.tracks
           ? `⚠️ ${opts.name} — nothing is loading from the audio host. Check your connection, then press play.`
           : `⚠️ ${opts.name} — every stream address failed. The station may be off air; المصحف المعلم still works.`);
@@ -307,7 +335,8 @@ function makeAudioPlayer(opts) {
      * happening against what actually is, and recover.
      */
     _startWatchdog() {
-      setInterval(() => this._check(), 6000);
+      if (this._watchdog) return;   // never stack (Podcast and AudioManager both guard)
+      this._watchdog = setInterval(() => this._check(), 6000);
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') this._check();
       });
