@@ -2,7 +2,7 @@
 
 > Compact reference: current features, full folder map, and a condensed changelog.
 > Read this first in any new session — it replaces re-deriving context from scratch.
-> Last updated: **2026-08-18**.
+> Last updated: **2026-09-02**.
 
 ---
 
@@ -24,7 +24,7 @@ git add -A && git commit -m "..." && git push
 ```
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v23**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v24**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -63,21 +63,21 @@ athan_app/
 │   └── candidates/                         theme-photo comparison pages
 │
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
-    ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (325 lines)
+    ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (328 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v23                     (75 lines)
+    ├── sw.js                  service worker — cache version v24                    (104 lines)
     ├── README.md              web-app-specific readme
-    ├── css/style.css          full site styling, responsive, RTL Arabic support     (368 lines)
+    ├── css/style.css          full site styling, responsive, RTL Arabic support     (378 lines)
     ├── js/
     │   ├── config.js            defaults + localStorage persistence, Safari-safe helpers (165)
-    │   ├── location.js          browser geolocation → reverse-geocode → IP fallback    (92)
+    │   ├── location.js          browser geolocation → reverse-geocode → IP fallback    (129)
     │   ├── prayer-times.js      Aladhan API client + per-day cache                      (88)
-    │   ├── scheduler.js         builds/fires today's event list, midnight rollover     (157)
+    │   ├── scheduler.js         builds/fires today's event list, midnight rollover     (203)
     │   ├── audio.js             single reusable <audio> element, keep-alive loop        (177)
-    │   ├── scene.js             ★ 20-frame living-sky engine (see §5)                  (410)
-    │   ├── podcast.js           Quran tab 1 — YouTube playlist, seek bar, resume logic  (365)
-    │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (396)
-    │   └── app.js               wires everything, UI rendering, settings, Test Athan    (410)
+    │   ├── scene.js             ★ 20-frame living-sky engine (see §5)                  (440)
+    │   ├── podcast.js           Quran tab 1 — YouTube playlist, seek bar, resume logic  (414)
+    │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (425)
+    │   └── app.js               wires everything, UI rendering, settings, Test Athan    (491)
     └── assets/
         ├── audio/*.m4a           same 11 recordings as desktop (~63 MB)
         ├── icons/                 PWA icons (SVG + 180/192/512 PNG)
@@ -194,6 +194,12 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
   and checking where the sun/moon actually sits, rather than trusting index labels — the anchors
   now match the art exactly.
 - Personal `*.HEIC` photo and any `*.zip` deliverables are gitignored — never pushed to the public repo.
+- **CSP `worker-src` governs SERVICE workers, not just web workers.** It was set to
+  `blob:` alone for the background-clock Worker, which silently blocked `sw.js` for
+  months — and because the directive is present there is no fallback to
+  `child-src`/`script-src`/`default-src`. It must be `worker-src 'self' blob:`. More
+  generally: never `.catch(() => {})` a registration or permission call. That empty catch
+  is the only reason a total failure of the offline layer went unnoticed.
 - **CSP and redirecting streams**: `media-src` must list `https://*.radiojar.com` as a wildcard,
   not individual hosts. The Radio Garden resolver 302-redirects to whichever Radiojar edge is
   healthy (`n12`, `n0b`, `n0e`…), and CSP validates the *redirect target* — pinning single hosts
@@ -257,6 +263,50 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     flat 3s), and a radio give-up message pointing at المصحف المعلم. Privacy: `no-referrer` and a
     Settings note naming the streaming hosts. sw.js v23.
 
+17. **Correctness pass (2026-09-02)** — a three-way audit of every file under
+    `docs/`, plus live testing against the deployed site. Seven real defects, several
+    of them long-standing:
+    - **The service worker had never registered.** `worker-src` was `blob:` alone;
+      that directive governs service workers too, so the same-origin `sw.js` failed the
+      check and `register()` threw `SecurityError` on every visit — swallowed by a
+      `.catch(() => {})`. Confirmed live: `caches.keys()` was `[]` and
+      `getRegistrations()` was `0`. **No offline support, no precache, and no PWA
+      installability has ever existed**, and every `CACHE_VERSION` bump from v18 to v23
+      was a no-op. Fixed to `worker-src 'self' blob:`; the registration error is now
+      logged to the Activity tab instead of discarded.
+    - **A failed prayer-times fetch silenced the athan permanently.** `Scheduler.dateKey`
+      was set only inside `build()`, reached only after a *successful* fetch, so any
+      failure left the midnight-rollover branch matching on every tick — and that branch
+      `return`s before the event loop. Harness: 600 ticks produced **600 refresh
+      dispatches and 0 athans**. The same branch also advanced `lastTick` before
+      returning, discarding any event due around midnight without even reporting it.
+    - **The Stop button did not stop the YouTube Quran tab** — it called `cancelResume()`,
+      which only set flags, and `Podcast` is not in the `QuranPlayers` registry so
+      `pauseAll()` could not cover for it.
+    - **The play/pause toggle bypassed the athan-priority guard in all three Quran tabs.**
+      `play()` checked `AudioManager.isPlaying()`; the toggle never did. Confirmed live —
+      11 seconds of Quran played over a simulated athan.
+    - **The give-up guard in `podcast.js` could never fire** — the identical bug fixed in
+      `audio-players.js` in item 16 but missed in this file. `play()` reset the counter
+      unconditionally and `onError`'s recovery path calls `play()`.
+    - **`scene.js` anchors went non-monotonic** whenever Isha falls after local midnight
+      (frames 17/18/19 never shown — the scene cut from golden hour to deep night at
+      Maghrib) or when twilight is under 20 minutes (frames 2-5 never shown).
+    - **The sound gate could be unreachable.** A fixed, non-scrolling flex box with
+      `align-items: center` overflows its ~640px card off *both* edges; the Enable button
+      is last in the card and is the only way past the gate.
+    Also: the Safari wrong-city fix (see §9), exponential backoff and a parameter-keyed
+    in-flight guard on the prayer-times fetch, `localStorage` access guarded so blocked
+    site data cannot kill `init()`, and the woduaa lead clamped so an empty field cannot
+    silently delete all five reminders.
+
+18. **Audio hosts verified for the first time (2026-09-02).** Previous sessions could not
+    reach the network, so the changelog's earlier claim that the sources were "verified
+    loading" was never actually tested. Probed under the live CSP in a real browser: all
+    six load — `el-hosary.com` 001 (72.1 s) and 036 (1590.8 s), and all four radio
+    addresses (`n12`, `n0b`, `stream.`, and the radio.garden resolver). المصحف المعلم and
+    the radio both play, mutual exclusion works, and pause/resume round-trips correctly.
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind)
@@ -275,3 +325,57 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
   (المجود، المفسر، حفص الإذاعة المصرية، ورش، قالون) — cheapest next source.
 - **Morning auto-play**: a chosen Quran source playing automatically between sunrise and the
   morning Azkar, toggleable in Settings.
+
+---
+
+## 9. The Safari wrong-city bug — resolved
+
+**Symptom.** Safari showed `Location: Helsinki, 18` while Settings held the correct
+Raleigh coordinates. Chrome on the same machine showed `Raleigh, NC`, which ruled out a
+VPN. `18` is the tail of ISO 3166-2 `FI-18` (Uusimaa).
+
+**Cause.** BigDataCloud answers from the caller's IP when it cannot use the coordinates
+it was given, and Safari's egress was an iCloud Private Relay node in Finland.
+CoreLocation was always correct; only the display label was wrong. **Prayer times were
+never affected** — `prayer-times.js` uses latitude/longitude only.
+
+**Why it took three sessions.** The fix was written once (commit `f93a95b`), never
+pushed, and lost with the patch file. It also shipped with a known hole: the sandbox
+blocked outbound HTTPS, so nobody could see the real response, and the guard depended on
+the service echoing coordinates back.
+
+**Settled by actually calling the API:**
+
+```
+reverse-geocode-client?latitude=35.78774&longitude=-78.68962
+  -> latitude 35.78774, longitude -78.68962, city "Raleigh", code "US-NC"
+
+reverse-geocode-client                       (no coordinates supplied)
+  -> lookupSource "ip geolocation", plus the IP's own coordinates
+```
+
+Two independent signals, either sufficient. `location.js` now rejects any answer whose
+`lookupSource` is `ip geolocation`, **and** any whose echoed coordinates are more than
+0.5° (~55 km) from the request. A non-alphabetic ISO tail (`FI-18` → `18`) is no longer
+rendered as a region abbreviation.
+
+Five scenarios, old → new: IP-answered Helsinki `Helsinki, 18` → discarded; same with no
+`lookupSource` → discarded; correct Raleigh answer → unchanged; a user genuinely in
+Helsinki → `Helsinki, Uusimaa` (the guard rejects contradictions, not countries); a
+degraded response with neither signal → unchanged.
+
+---
+
+## 10. Superseded session files
+
+`ATHAN_SESSION_HANDOFF [Claude Code].md` and `SESSION-HANDOFF [Claude Design].md` sit at
+the repo root, untracked and gitignored-by-omission. Everything still true in them has
+been folded into this file. Their open items are all now closed: `f93a95b` rewritten
+(§9), both Quran tabs tested end to end (§7 item 18), and the audio hosts verified. They
+can be deleted.
+
+**Two claims in them are wrong and should not be carried forward:**
+- "all sources verified loading under the live policy" (Claude Design) was never tested —
+  that session had no network. It happens to be true, but only as of 2026-09-02.
+- The Claude Code handoff's `PROJECT_NOTES.md` line counts were already stale. Re-verify
+  any number against `wc -l` before trusting it.
