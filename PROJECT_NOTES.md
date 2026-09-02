@@ -393,6 +393,27 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     Invisible for full mushafs where position + 1 *is* the surah number — which is exactly why
     a happy-path harness could not catch it. **A partial mushaf must render real surah numbers.**
 
+24. **Desktop app: the menu-bar icon opened nothing (2026-09-02).** The green crescent
+    appeared and the app ran, but clicking it produced no window. Two faults, compounding:
+    - `.venv` is built on **Homebrew python@3.14, which ships no tkinter** (it is the separate
+      `python-tk` formula). `gui/main_window.py` imports tkinter at module level, so the helper
+      process died on its first import.
+    - `_show_rich_payload` launched that helper with `stderr=subprocess.DEVNULL`, and `Popen`
+      itself succeeds — the process starts, *then* dies. So the tray returned success, no
+      fallback dialog ran, and nothing anywhere recorded a reason.
+    Underneath both: `_get_dialog_python()` returned the first candidate unconditionally (the
+    `for` loop `return`ed on its first iteration), so the .venv was always chosen and the
+    `python3` / `python` fallbacks below it were dead code.
+    Fixed by probing each candidate with `python -c "import tkinter"` and taking the first that
+    works, caching the result, appending `/usr/bin/python3` (macOS system Python always has Tk)
+    as the last resort, keeping the helper's stderr in `~/.athan_app/helper-window.log`, and
+    showing an actionable dialog when no interpreter can do Tk. The helper imports **only
+    stdlib**, so system Python runs it fine — no venv packages are needed.
+
+    **The lesson, and it recurs in this project:** `DEVNULL` on a subprocess you depend on is
+    the same defect as `.catch(() => {})` on the service-worker registration (changelog 17) —
+    a whole subsystem failing in total silence.
+
 ## 8. Possible future ideas (not requested yet)
 
 - Analytics (only if the user changes their mind)

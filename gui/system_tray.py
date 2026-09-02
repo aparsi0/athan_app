@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 import threading
-from utils.app_paths import get_bundle_root, get_project_root
+from utils.app_paths import get_bundle_root, get_project_root, get_config_dir
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -52,26 +52,71 @@ class SystemTrayManager:
         return base64.urlsafe_b64encode(raw).decode("utf-8")
 
     def _get_dialog_python(self) -> str | None:
-        """Return a usable Python executable for the detached dialog helper."""
-        candidates = []
+        """Return a Python that can actually run the Tk helper window.
+
+        The helper needs tkinter and nothing else — every one of its imports is
+        stdlib. That matters, because the obvious choice is often the wrong one:
+        a .venv built on Homebrew python has NO tkinter (Homebrew ships it as a
+        separate python-tk formula), so the helper died on `import tkinter` the
+        moment it started. Its stderr went to /dev/null and Popen had already
+        succeeded, so the tray reported success and the user saw nothing at all
+        when clicking the menu-bar icon.
+
+        This used to return the first candidate unconditionally — the loop
+        exited on its first iteration, which made every fallback below it dead
+        code. Each candidate is now probed for tkinter, and the answer cached
+        so the ~100ms probe does not run on every click.
+        """
+        if getattr(self, "_dialog_python_cached", False):
+            return self._dialog_python
+
+        candidates: list[str] = []
         project_python = get_project_root() / ".venv" / "bin" / "python"
         if project_python.exists():
             candidates.append(str(project_python))
         if sys.executable and os.path.basename(sys.executable).startswith("python"):
             candidates.append(sys.executable)
-        python3_path = shutil.which("python3")
-        if python3_path:
-            candidates.append(python3_path)
-        python_path = shutil.which("python")
-        if python_path:
-            candidates.append(python_path)
+        for name in ("python3", "python"):
+            found = shutil.which(name)
+            if found:
+                candidates.append(found)
+        # macOS system Python always ships with Tk, so it is the reliable
+        # last resort when everything else is a Tk-less Homebrew build.
+        candidates.append("/usr/bin/python3")
 
+        chosen = None
         seen = set()
         for candidate in candidates:
-            if candidate and candidate not in seen:
-                seen.add(candidate)
-                return candidate
-        return None
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            if not os.path.exists(candidate):
+                continue
+            try:
+                probe = subprocess.run(
+                    [candidate, "-c", "import tkinter"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                )
+            except Exception as e:
+                logger.warning(f"Could not probe {candidate} for tkinter: {e}")
+                continue
+            if probe.returncode == 0:
+                chosen = candidate
+                break
+            logger.info(f"{candidate} has no tkinter; trying the next interpreter")
+
+        if chosen:
+            logger.info(f"Dialog helper will use {chosen}")
+        else:
+            logger.error(
+                "No available Python has tkinter, so the helper window cannot open. "
+                "Install it with:  brew install python-tk@3.14"
+            )
+        self._dialog_python = chosen
+        self._dialog_python_cached = True
+        return chosen
 
     def _show_rich_payload(self, payload: dict) -> bool:
         """Show the styled helper window.
@@ -108,6 +153,14 @@ class SystemTrayManager:
         helper_path = get_project_root() / "gui" / "main_window.py"
         python_executable = self._get_dialog_python()
 
+        if helper_path.exists() and not python_executable:
+            self._show_simple_info(
+                "Athan App — window unavailable",
+                "No Python with tkinter was found, so the dashboard cannot open.\n\n"
+                "Fix it with:  brew install python-tk@3.14",
+            )
+            return False
+
         if not helper_path.exists() or not python_executable:
             # Fall back to in-process if helper layout is missing
             try:
@@ -129,10 +182,18 @@ class SystemTrayManager:
                 return False
 
         try:
+            # Keep the helper's stderr. Sending it to /dev/null is what hid a
+            # crash-on-import for so long: the window silently never appeared
+            # and nothing anywhere said why.
+            err_path = get_config_dir() / "helper-window.log"
+            try:
+                err_handle = open(err_path, "ab", buffering=0)
+            except Exception:
+                err_handle = subprocess.DEVNULL
             subprocess.Popen(
                 [python_executable, str(helper_path), self._encode_payload(payload)],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=err_handle,
                 start_new_session=True,
             )
             return True
