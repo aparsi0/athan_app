@@ -164,7 +164,7 @@ const App = {
       // A suspended tab is the most likely way to reach mid-morning, so a
       // Fajr we slept through must still open the morning Quran window.
       if (event.kind === 'athan' && event.prayer === 'fajr') {
-        this.startMorningQuran('Fajr passed while the tab was suspended');
+        this.startMorningQuran('Fajr passed while the tab was suspended', true);
       }
       this.renderSchedule();
       return;
@@ -199,7 +199,7 @@ const App = {
       QuranPlayers.resumeAll(); // Quran continues where it was interrupted
       // The morning Quran starts the moment the Fajr chain is done, not at a
       // clock time — "right after Fajr" means after the athan AND its duaa.
-      if (event.prayer === 'fajr') this.startMorningQuran('the Fajr athan finished');
+      if (event.prayer === 'fajr') this.startMorningQuran('the Fajr athan finished', true);
       this.renderSchedule();
       return;
     }
@@ -216,36 +216,51 @@ const App = {
   /** Start (or resume) the morning Quran, if it is enabled and we are inside
    *  today's window. Safe to call repeatedly — it never restarts a player
    *  that is already going, and never plays over prayer audio. */
-  startMorningQuran(why) {
+  /**
+   * Start the morning Quran.
+   *
+   * `preempt` marks the scheduled moment — the end of the Fajr chain. There it
+   * behaves like any other scheduled audio (athan, woduaa, duaa, azkar): it
+   * takes over from whatever was playing. Reciters.player.play() runs
+   * QuranPlayers.silenceOthers(), so the radio or المصحف المعلم is stopped.
+   *
+   * Without `preempt` this is a catch-up call — a page opened mid-window, the
+   * sound gate being tapped, or any schedule rebuild (which happens on every
+   * settings save and location change). Those fire repeatedly and are not a
+   * scheduled moment, so they only start when nothing else is playing;
+   * otherwise saving an unrelated setting at 08:00 would cut off whatever the
+   * visitor had deliberately put on.
+   */
+  startMorningQuran(why, preempt) {
     const cfg = Config.get('special_audio_settings.morning_quran', {});
     if (!cfg.enabled) return;
     if (typeof Reciters === 'undefined' || !Reciters.player) return;
     if (!Scheduler.inMorningWindow()) return;
-    if (AudioManager.isPlaying()) return;          // athan/azkar always wins
-    // Never override a deliberate choice. This has to consider EVERY Quran
-    // player, not just the reciters tab: someone who fell asleep to the Cairo
-    // radio, or to المصحف المعلم, has chosen what they want playing, and the
-    // morning auto-play would otherwise silence it and switch to رفعت.
-    // `playing` alone is not enough — it is set by the audio element's own
-    // event, which cannot have fired when this runs straight after
-    // resumeAll(); _shouldBePlaying and _resumeWanted are set synchronously.
-    if (QuranPlayers.anyActive()) return;
+    if (AudioManager.isPlaying()) return;          // prayer audio always wins
     // Nothing can play before the visitor has tapped the sound gate; trying
     // anyway logs a scary failure and leaves the watchdog nudging forever.
     if (!AudioManager.unlocked) return;
 
+    const wanted = cfg.reciter_id || RECITERS[0].id;
+    const sameReciter = Reciters.active().id === wanted;
+    // Already playing exactly what we were about to start — leave it be rather
+    // than restarting the surah from its beginning.
+    if (sameReciter && (Reciters.player.playing || Reciters.player._shouldBePlaying)) return;
+    // `playing` alone is not enough here: it is set by the audio element's own
+    // event, which cannot have fired when this runs straight after
+    // resumeAll(). _shouldBePlaying and _resumeWanted are set synchronously.
+    if (!preempt && QuranPlayers.anyActive()) return;
+
     // Read the saved position BEFORE switching reciter — selecting a
     // different one deliberately clears it.
     const saved = Number(Config.get('audio_settings.quran_last_index', 0)) || 0;
-    const wanted = cfg.reciter_id || RECITERS[0].id;
-    const sameReciter = Reciters.active().id === wanted;
     Reciters.selectById(wanted);
     const at = sameReciter ? saved : 0;
 
     const sheikh = Reciters.active().sheikh;
     const until = Scheduler.morningWindow ? this.fmtTime(Scheduler.morningWindow.end) : '';
     this.logStatus(`🕌 Morning Quran — ${sheikh}${until ? ` until ${until}` : ''} (${why}).`);
-    Reciters.player.play(at);
+    Reciters.player.play(at);   // silences every other Quran player
   },
 
   /** Stop the morning Quran for good. Unconditional on purpose: if another
