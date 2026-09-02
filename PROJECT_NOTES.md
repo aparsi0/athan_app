@@ -22,6 +22,22 @@
 # edit files under docs/, then:
 git add -A && git commit -m "..." && git push
 ```
+
+**Pushing (2026-09-02).** GitHub has not accepted account passwords for git since 2021.
+What works on this Mac is a **classic** personal access token
+(github.com/settings/tokens, tick the top-level `repo` scope), entered as the *password*
+with `aparsi0` as the username. macOS Keychain then remembers it.
+
+Two traps, both of which cost a session:
+- A **read-only credential cached in the Keychain** authenticates fine and then fails the
+  push with `remote: Permission to aparsi0/athan_app.git denied to aparsi0` — a 403, not an
+  auth error. Clear it before retrying, or git never prompts for the new token:
+  `printf "protocol=https\nhost=github.com\n\n" | git credential-osxkeychain erase`
+- **Fine-grained** tokens need the repository explicitly selected *and* Contents set to
+  "Read and write". Miss either and you get exactly the same 403. Classic tokens avoid it.
+
+SSH is the durable alternative (`git remote set-url origin git@github.com:aparsi0/athan_app.git`),
+and bypasses the Keychain, token scopes and the Claude GitHub App entirely.
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
 `CACHE_VERSION` in `docs/sw.js` (currently **v25**) so visitors' service workers refresh promptly.
