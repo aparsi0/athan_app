@@ -287,17 +287,6 @@ input[type="range"].seek::-moz-range-thumb {
   cursor: pointer;
 }
 input[type="range"].seek:disabled { opacity: 0.4; cursor: default; }
-#ytThumb {
-  position: fixed; right: 12px; bottom: 76px; z-index: 55;
-  width: 178px; border-radius: 10px; overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.3);
-  box-shadow: 0 8px 22px rgba(0,0,0,0.5);
-  transition: width 0.25s;
-  display: none;
-}
-#ytThumb.expanded { width: min(480px, 92vw); }
-#ytThumb .yt-note { background: rgba(6,12,24,0.92); color: var(--muted); font-size: 9.5px; padding: 4px 8px; text-align: center; cursor: pointer; }
-#ytThumb iframe { display: block; width: 100%; aspect-ratio: 16/9; border: 0; }
 ol.surah-list {
   list-style: none;
   max-height: 320px; overflow-y: auto;
@@ -376,3 +365,18 @@ footer a { color: var(--gold-soft); }
   .p-ar { min-width: 58px; font-size: 16px; }
   .theme-grid { grid-template-columns: 1fr; }
 }
+
+/* Reciter selector — Quran tab */
+.reciter-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 2px 0 14px;
+}
+.reciter-row label { font-size: 13px; color: var(--muted); }
+.reciter-row select {
+  font: inherit; font-size: 14px; padding: 7px 10px; min-width: 240px; max-width: 100%;
+  color: var(--text); background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.22); border-radius: 8px;
+}
+.reciter-row select option { color: #12293f; background: #fff; }
+.reciter-note { font-size: 12.5px; color: var(--gold, #d9a44a); }
+#quranHeading { font-weight: 600; }
