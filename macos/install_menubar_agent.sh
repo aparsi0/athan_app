@@ -9,7 +9,15 @@
 set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_BINARY="$APP_DIR/dist/AthanApp.app/Contents/MacOS/AthanApp"
+# Prefer the installed copy: dist/ is a build directory, and setup.sh empties
+# it on every run. An agent pointed there stops working the next time you build.
+if [[ -n "${ATHAN_APP_BUNDLE:-}" && -x "${ATHAN_APP_BUNDLE}/Contents/MacOS/AthanApp" ]]; then
+  APP_BINARY="${ATHAN_APP_BUNDLE}/Contents/MacOS/AthanApp"
+elif [[ -x "/Applications/AthanApp.app/Contents/MacOS/AthanApp" ]]; then
+  APP_BINARY="/Applications/AthanApp.app/Contents/MacOS/AthanApp"
+else
+  APP_BINARY="$APP_DIR/dist/AthanApp.app/Contents/MacOS/AthanApp"
+fi
 PLIST_SOURCE="$APP_DIR/macos/com.apa.athan-menubar.plist"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 PLIST_TARGET="$LAUNCH_AGENTS_DIR/com.apa.athan-app.plist"
@@ -18,10 +26,11 @@ STDOUT_LOG="$CONFIG_DIR/launchd.stdout.log"
 STDERR_LOG="$CONFIG_DIR/launchd.stderr.log"
 
 if [[ ! -x "$APP_BINARY" ]]; then
-  echo "❌ Built app not found at:"
+  echo "❌ No built app found. Looked in:"
+  echo "   /Applications/AthanApp.app"
   echo "   $APP_DIR/dist/AthanApp.app"
-  echo "Build it first:"
-  echo "   chmod +x packaging/build_macos_app.sh && ./packaging/build_macos_app.sh"
+  echo "Build and install it first:"
+  echo "   ./setup.sh"
   exit 1
 fi
 
