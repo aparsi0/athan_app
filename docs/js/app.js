@@ -473,6 +473,40 @@ const App = {
       if (btn.dataset.tab === 'settings') this.openSettings();
     });
 
+    // Copy the install command. navigator.clipboard needs a secure context and
+    // is absent in a few mobile browsers, so fall back to a hidden textarea
+    // rather than leaving a button that does nothing.
+    const copyInstall = document.getElementById('copyInstall');
+    if (copyInstall) {
+      copyInstall.addEventListener('click', async () => {
+        const source = document.getElementById('installCmd');
+        if (!source) return;
+        const text = source.textContent;
+        let copied = false;
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          }
+        } catch (_err) { copied = false; }
+        if (!copied) {
+          try {
+            const scratch = document.createElement('textarea');
+            scratch.value = text;
+            scratch.setAttribute('readonly', '');
+            scratch.style.position = 'fixed';
+            scratch.style.opacity = '0';
+            document.body.appendChild(scratch);
+            scratch.select();
+            copied = document.execCommand('copy');
+            document.body.removeChild(scratch);
+          } catch (_err) { copied = false; }
+        }
+        copyInstall.textContent = copied ? 'Copied' : 'Select and copy';
+        setTimeout(() => { copyInstall.textContent = 'Copy'; }, 2000);
+      });
+    }
+
     document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
     document.getElementById('resetSettings').addEventListener('click', () => {
       Config.reset();

@@ -197,36 +197,38 @@
       <div class="card">
         <h3>Install the Desktop App</h3>
         <p class="hint" style="margin-top:0">This website works everywhere with nothing to install — but for a
-          permanent, always-on athan (menu-bar icon, auto-start when the computer turns on), you can install the
-          desktop application. Pick your system below; each link opens the exact step-by-step instructions on GitHub.</p>
+          permanent, always-on athan (menu-bar icon, auto-start when the computer turns on), there is a desktop
+          application. It is one command, and the same command installs, updates and repairs it.</p>
+
+        <div class="install-cmd">
+          <code id="installCmd">git clone https://github.com/aparsi0/athan_app.git ~/Desktop/athan_app
+cd ~/Desktop/athan_app &amp;&amp; ./setup.sh</code>
+          <button type="button" id="copyInstall" class="copy-btn" aria-label="Copy the install command">Copy</button>
+        </div>
+        <p class="hint">macOS and Linux. It installs whatever is missing — Homebrew, Python, Tkinter, VLC —
+          upgrades whatever is out of date, runs the tests and builds the app. On Windows the equivalent is
+          <code>powershell -ExecutionPolicy Bypass -File .\setup.ps1</code>.</p>
+
         <ul class="install-list">
-          <li><a href="https://github.com/aparsi0/athan_app#-install-as-a-menu-bar-app-with-auto-start-macos--recommended" target="_blank" rel="noopener">
+          <li><a href="https://github.com/aparsi0/athan_app#-installation" target="_blank" rel="noopener">
+            <span class="inst-icon">📖</span>
+            <span class="inst-text"><strong>Full instructions</strong><span>The command, the four options, and exactly what it replaces versus what it leaves alone.</span></span>
+            <span class="inst-go">↗</span></a></li>
+          <li><a href="https://github.com/aparsi0/athan_app#-running-at-login-macos" target="_blank" rel="noopener">
             <span class="inst-icon">🌙</span>
-            <span class="inst-text"><strong>macOS — Menu-Bar App with Auto-Start</strong><span>Recommended. The green crescent in the menu bar, starts at every login, keeps the Mac awake.</span></span>
-            <span class="inst-go">↗</span></a></li>
-          <li><a href="https://github.com/aparsi0/athan_app#macbook-m1--m2--m3" target="_blank" rel="noopener">
-            <span class="inst-icon"></span>
-            <span class="inst-text"><strong>MacBook M1 / M2 / M3 (Apple Silicon)</strong><span>Terminal setup from scratch — Homebrew, Python, VLC (arm64 warning included).</span></span>
-            <span class="inst-go">↗</span></a></li>
-          <li><a href="https://github.com/aparsi0/athan_app#imac--macbook-intel" target="_blank" rel="noopener">
-            <span class="inst-icon">🖥</span>
-            <span class="inst-text"><strong>iMac / MacBook Intel</strong><span>Terminal setup for Intel Macs.</span></span>
+            <span class="inst-text"><strong>Start it at login (macOS)</strong><span><code>./setup.sh --autostart</code> — the crescent in the menu bar, every login, keeping the Mac awake.</span></span>
             <span class="inst-go">↗</span></a></li>
           <li><a href="https://github.com/aparsi0/athan_app#windows-10--11" target="_blank" rel="noopener">
             <span class="inst-icon">🪟</span>
-            <span class="inst-text"><strong>Windows 10 / 11</strong><span>Python + VLC setup in PowerShell.</span></span>
+            <span class="inst-text"><strong>Windows 10 / 11</strong><span>The PowerShell equivalent, over winget.</span></span>
             <span class="inst-go">↗</span></a></li>
-          <li><a href="https://github.com/aparsi0/athan_app#as-a-system-service-linux" target="_blank" rel="noopener">
-            <span class="inst-icon">🐧</span>
-            <span class="inst-text"><strong>Linux</strong><span>Run as a systemd user service.</span></span>
+          <li><a href="https://github.com/aparsi0/athan_app#iphone-ipad-and-android" target="_blank" rel="noopener">
+            <span class="inst-icon">📱</span>
+            <span class="inst-text"><strong>iPhone, iPad and Android</strong><span>Nothing to install — this page is the full app. Add it to your home screen.</span></span>
             <span class="inst-go">↗</span></a></li>
-          <li><a href="https://github.com/aparsi0/athan_app#run-automatically-on-macos-with-launchd-headless--no-menu-bar-icon" target="_blank" rel="noopener">
-            <span class="inst-icon">⚙️</span>
-            <span class="inst-text"><strong>macOS headless (no menu-bar icon)</strong><span>Background-only variant via launchd.</span></span>
-            <span class="inst-go">↗</span></a></li>
-          <li><a href="https://github.com/aparsi0/athan_app#verify-installation" target="_blank" rel="noopener">
-            <span class="inst-icon">✅</span>
-            <span class="inst-text"><strong>Verify your installation</strong><span>Test that audio, prayer times and scheduling all work.</span></span>
+          <li><a href="https://github.com/aparsi0/athan_app#if-something-goes-wrong" target="_blank" rel="noopener">
+            <span class="inst-icon">🛠</span>
+            <span class="inst-text"><strong>If something goes wrong</strong><span>What the setup checks, and the one command that fixes a broken install.</span></span>
             <span class="inst-go">↗</span></a></li>
         </ul>
         <p class="hint">📱 On phones there is nothing to install: open this site and use your browser's
