@@ -177,6 +177,21 @@ def main():
             17,
         )
 
+        print("--- recitals are ordered by the mushaf, not the alphabet ---")
+        titles = [r["title"] for r in library["refat"]["recitals"]]
+        check("البقرة before آل عمران",
+              titles.index("من 51 - 73 البقرة") < titles.index("من 6 - 20 آل عمران"), True)
+        check("verse 6 before verse 28 in the same surah",
+              titles.index("من 6 - 20 آل عمران") < titles.index("من 28 - 51 آل عمران"), True)
+        check("آل عمران before النساء",
+              titles.index("من 28 - 51 آل عمران") < titles.index("من 58 - 79 النساء"), True)
+        check("النساء 58 before النساء 128 (numeric, not string, order)",
+              titles.index("من 58 - 79 النساء") < titles.index("من 128 - 139 النساء"), True)
+        check("المرسلات (77) last of the verse ranges",
+              titles.index("من 1 - 23 المرسلات"), len(titles) - 2)
+        check("a session with no verse range sorts after them",
+              titles[-1].startswith("ما تيسر"), True)
+
         print("--- source selection ---")
         player = qp.QuranPlayer(Config({"audio_settings.quran_library_path": lib_dir}))
         check("library indexed", player.library_dir, lib_dir)

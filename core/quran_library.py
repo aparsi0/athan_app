@@ -123,6 +123,34 @@ def pretty_title(filename: str) -> str:
     return stem.strip(" -")
 
 
+def recital_order(title: str):
+    """Sort key putting تلاوات in Quranic order, not alphabetical order.
+
+    A plain string sort reads badly: "من 128 - 139 النساء" lands before
+    "من 28 - 51 آل عمران" because 1 < 2, and آل عمران comes after النساء
+    because of the Arabic alphabet rather than the mushaf. So sort by the
+    surah the recital is from, then by its first verse.
+
+    A session spanning several surahs has no single position; those sort last,
+    among themselves by title.
+    """
+    flat = _normalise(title)
+    surah = None
+    for name, number in _SURAH_LOOKUP.items():
+        if name and name in flat:
+            # Longest name wins: "الرحمن" is inside nothing, but "النساء" and
+            # "النبا" both live inside longer strings elsewhere.
+            if surah is None or len(name) > surah[1]:
+                surah = (number, len(name))
+    if surah is None:
+        return (2, 0, 0, title)
+    verse_match = re.search(r"من\s*(\d+)", title)
+    verse = int(verse_match.group(1)) if verse_match else 0
+    # A recital with no "من N" is a whole-session reading of that surah; put it
+    # after the verse ranges from the same surah rather than before them.
+    return (0 if verse_match else 1, surah[0], verse, title)
+
+
 def scan_library(directory: str) -> Dict[str, dict]:
     """Index `directory` into {reciter_id: {'surahs': {n: path}, 'recitals': [...]}}.
 
@@ -152,6 +180,9 @@ def scan_library(directory: str) -> Dict[str, dict]:
             entry["surahs"][number] = path
         else:
             entry["recitals"].append({"title": pretty_title(name), "path": path})
+
+    for entry in result.values():
+        entry["recitals"].sort(key=lambda item: recital_order(item["title"]))
 
     if unattributed:
         logger.info(
