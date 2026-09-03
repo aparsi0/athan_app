@@ -635,6 +635,7 @@ class DashboardWindow:
         self._build_audio_volume_section(body)
         self._build_special_audio_section(body)
         self._build_morning_quran_section(body)
+        self._build_quran_library_section(body)
         self._build_settings_actions(body)
 
     def _build_morning_quran_section(self, parent: tk.Frame):
@@ -698,6 +699,78 @@ class DashboardWindow:
             bg=PALETTE["card_alt"], fg=PALETTE["muted"],
             font=("SF Pro Text", 10), justify="left", anchor="w",
         ).pack(fill="x", pady=(6, 0))
+
+    def _build_quran_library_section(self, parent: tk.Frame):
+        """Local Quran recordings: where they are, and what was found there."""
+        section = self._section_box(parent, "Local Quran Recordings")
+        current = ((self.config.get("audio_settings", {}) or {})
+                   .get("quran_library_path", "") or "")
+
+        self._labeled_entry(
+            section, "audio_settings.quran_library_path",
+            "Folder", current,
+        )
+
+        summary = self._quran_library_summary(current)
+        tk.Label(
+            section, text=summary,
+            bg=PALETTE["card_alt"], fg=PALETTE["muted"],
+            font=("SF Pro Text", 10), justify="left", anchor="w",
+            wraplength=620,          # a long folder path must wrap, not clip
+        ).pack(fill="x", pady=(6, 0))
+
+        tk.Label(
+            section,
+            text=("Files here are used instead of streaming, so they start instantly and keep\n"
+                  "working offline. Complete surahs join the numbered mushaf; verse ranges and\n"
+                  "multi-surah sessions become that sheikh's تلاوات list. The reciter is read from\n"
+                  "each file name, not the folder name, so one folder can hold several sheikhs.\n"
+                  "Leave this blank to use the default locations."),
+            bg=PALETTE["card_alt"], fg=PALETTE["muted"],
+            font=("SF Pro Text", 10), justify="left", anchor="w",
+        ).pack(fill="x", pady=(6, 0))
+
+    def _quran_library_summary(self, configured: str) -> str:
+        """One line per sheikh found, or why nothing was found. Never raises —
+        a settings panel must open even when the folder is unreadable."""
+        def short(path: str) -> str:
+            home = os.path.expanduser("~")
+            return "~" + path[len(home):] if path.startswith(home) else path
+
+        try:
+            from core.quran_library import scan_library
+            from core.quran_player import DEFAULT_LIBRARY_DIRS, load_reciters
+
+            try:
+                _names, reciters = load_reciters()
+            except Exception:
+                reciters = []
+            sheikhs = {r.get("id"): r.get("sheikh") or r.get("id") for r in reciters}
+
+            candidates = [configured] if configured else list(DEFAULT_LIBRARY_DIRS)
+            for candidate in candidates:
+                if not candidate:
+                    continue
+                path = os.path.expanduser(candidate)
+                if not os.path.isdir(path):
+                    continue
+                library = scan_library(path)
+                if not library:
+                    return f"Found {short(path)}, but no file name there names a reciter."
+                lines = [f"Reading {short(path)}"]
+                for reciter_id, entry in sorted(library.items()):
+                    lines.append(
+                        "  • {name} — {s} complete surah(s), {r} recital(s)".format(
+                            name=sheikhs.get(reciter_id, reciter_id),
+                            s=len(entry["surahs"]), r=len(entry["recitals"]),
+                        )
+                    )
+                return "\n".join(lines)
+            if configured:
+                return f"Not found: {short(os.path.expanduser(configured))}"
+            return "No local recordings folder found — everything streams."
+        except Exception as exc:
+            return f"Could not read the folder: {exc}"
 
     def _build_location_section(self, parent: tk.Frame):
         section = self._section_box(parent, "Location")
@@ -1181,6 +1254,15 @@ class DashboardWindow:
                 cm.set(f"{mq}.reciter_id", chosen)
             _set_int(f"{mq}.end_after_azkar_minutes",
                      self.settings_vars[f"{mq}.end_after_azkar_minutes"].get())
+
+        # Local Quran recordings. Blank is meaningful — it restores the default
+        # search locations — so this one is set even when empty.
+        if "audio_settings.quran_library_path" in self.settings_vars:
+            folder = self.settings_vars["audio_settings.quran_library_path"].get().strip()
+            if folder and not os.path.isdir(os.path.expanduser(folder)):
+                errors.append(f"Quran recordings folder not found: {folder}")
+            else:
+                cm.set("audio_settings.quran_library_path", folder)
 
         return errors
 
