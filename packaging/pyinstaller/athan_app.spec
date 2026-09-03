@@ -5,11 +5,31 @@ from pathlib import Path
 project_root = Path(SPECPATH).resolve().parents[1]
 vlc_root = Path("/Applications/VLC.app/Contents/MacOS")
 
+# The audio and the reciter table now live under docs/, which is the only copy
+# — GitHub Pages can serve nothing outside that directory, so it is docs/ that
+# could not move. They are still placed at "assets/..." INSIDE the bundle, so
+# every path in config/settings.py keeps working untouched.
+#
+# Only what the desktop app actually uses is bundled. docs/assets also holds
+# twenty sky photographs and the local reciter overrides, which belong to the
+# website and would add tens of megabytes to the .app for nothing.
 datas = []
-for relative_path in ("assets",):
-    source = project_root / relative_path
-    if source.exists():
-        datas.append((str(source), relative_path))
+
+audio_source = project_root / "docs" / "assets" / "audio"
+if audio_source.exists():
+    for audio_file in sorted(audio_source.glob("*.m4a")):
+        datas.append((str(audio_file), "assets/audio"))
+
+# Without this the frozen app finds no reciters, and every Quran feature —
+# the morning window included — silently does nothing. It was missing until
+# 2026-09-03, which is exactly how that looked.
+reciters_json = project_root / "docs" / "assets" / "reciters.json"
+if reciters_json.exists():
+    datas.append((str(reciters_json), "assets"))
+
+icons_source = project_root / "docs" / "assets" / "icons"
+if icons_source.exists():
+    datas.append((str(icons_source), "assets/icons"))
 
 if (vlc_root / "plugins").exists():
     datas.append((str(vlc_root / "plugins"), "VLC/plugins"))

@@ -1045,14 +1045,14 @@ class DashboardWindow:
         """Resolve a possibly-relative config path to an absolute existing file."""
         import os
         from pathlib import Path
-        from utils.app_paths import get_audio_search_dirs, get_config_dir, get_bundle_root
+        from utils.app_paths import get_asset_roots, get_audio_search_dirs, get_config_dir
 
         if not path_str:
             return ""
         if os.path.isabs(path_str) and os.path.exists(path_str):
             return path_str
         # Mirror the runtime resolver: check config dir, bundle, then audio search dirs.
-        candidates = [get_config_dir() / path_str, get_bundle_root() / path_str]
+        candidates = [root / path_str for root in get_asset_roots()]
         for c in candidates:
             if c.exists():
                 return str(c)

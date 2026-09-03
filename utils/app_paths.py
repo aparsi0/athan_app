@@ -47,14 +47,51 @@ def get_launchd_stderr_log_path() -> Path:
     return get_config_dir() / "launchd.stderr.log"
 
 
+def get_asset_roots() -> list[Path]:
+    """Directories a relative "assets/..." path may resolve against, in
+    priority order.
+
+    Four of them, and each earns its place:
+
+      1. the user's config dir  — overrides, so a custom athan wins
+      2. the bundle root        — what shipped inside AthanApp.app
+      3. the project root       — a source checkout (historical layout)
+      4. the project's docs/    — a source checkout TODAY
+
+    (4) is the live one. The audio used to be stored twice, once for the
+    desktop app in assets/ and once for the website in docs/assets/, eleven
+    byte-identical files in each. docs/ is the copy that cannot move, because
+    GitHub Pages only serves from there, so that copy became the only copy.
+    (3) stays so an old checkout, or a bundle built before the change, still
+    resolves.
+    """
+    roots = [
+        get_config_dir(),
+        get_bundle_root(),
+        get_project_root(),
+        get_project_root() / "docs",
+    ]
+    unique = []
+    for root in roots:
+        if root not in unique:
+            unique.append(root)
+    return unique
+
+
+def resolve_asset(relative_path) -> Path | None:
+    """First existing match for a relative "assets/..." path, or None."""
+    for root in get_asset_roots():
+        candidate = root / relative_path
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def get_audio_search_dirs() -> list[Path]:
     """Return audio directories to search in priority order."""
-    config_audio_dir = get_config_dir() / "assets" / "audio"
-    bundle_audio_dir = get_bundle_root() / "assets" / "audio"
-    project_audio_dir = get_project_root() / "assets" / "audio"
-
     dirs = []
-    for path in (config_audio_dir, bundle_audio_dir, project_audio_dir):
+    for root in get_asset_roots():
+        path = root / "assets" / "audio"
         if path not in dirs:
             dirs.append(path)
     return dirs

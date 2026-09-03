@@ -10,7 +10,12 @@ import time
 from typing import Optional, Callable
 import logging
 from pathlib import Path
-from utils.app_paths import get_audio_search_dirs, get_bundle_root, get_config_dir
+from utils.app_paths import (
+    get_asset_roots,
+    get_audio_search_dirs,
+    get_bundle_root,
+    get_config_dir,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -417,7 +422,7 @@ class PrayerAudioManager:
         relative_path = Path(file_path)
 
         # First try the configured relative path against supported roots.
-        candidate_roots = [get_config_dir(), get_bundle_root()]
+        candidate_roots = get_asset_roots()
         for root in candidate_roots:
             candidate = root / relative_path
             if candidate.exists():
@@ -680,7 +685,8 @@ if __name__ == "__main__":
     print("Testing Audio Player...")
     
     # Test with user's audio file
-    audio_file = str(get_bundle_root() / "assets" / "audio" / "Azansoundtrack.m4a")
+    from utils.app_paths import resolve_asset
+    audio_file = str(resolve_asset("assets/audio/Azansoundtrack.m4a") or "")
     
     if os.path.exists(audio_file):
         player = AudioPlayer()
