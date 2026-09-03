@@ -270,11 +270,14 @@ if [[ $BUILD_APP -eq 1 && "$OS" == macos ]]; then
   [[ -d dist/AthanApp.app ]] || die "The build finished but dist/AthanApp.app is not there."
   ok "Built dist/AthanApp.app"
 
+  INSTALLED_BUNDLE=""
   if [[ -w /Applications ]]; then
     rm -rf "/Applications/AthanApp.app"
     cp -R dist/AthanApp.app /Applications/
+    INSTALLED_BUNDLE="/Applications/AthanApp.app"
     ok "Installed to /Applications/AthanApp.app"
   else
+    INSTALLED_BUNDLE="$APP_DIR/dist/AthanApp.app"
     warn "/Applications is not writable; the app stays in dist/"
   fi
 fi
@@ -282,7 +285,9 @@ fi
 if [[ $AUTOSTART -eq 1 && "$OS" == macos ]]; then
   step "Starting at login"
   chmod +x macos/install_menubar_agent.sh
-  ./macos/install_menubar_agent.sh
+  # Point launchd at the installed copy, not dist/, which this script empties
+  # on every run.
+  ATHAN_APP_BUNDLE="${INSTALLED_BUNDLE:-}" ./macos/install_menubar_agent.sh
 fi
 
 # ---------------------------------------------------------------------------
