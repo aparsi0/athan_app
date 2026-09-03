@@ -2,11 +2,14 @@
   "_comment": [
     "Single source of truth for the Quran reciters, read by BOTH the web app",
     "(docs/js/reciters.js) and the desktop app (core/quran_player.py). Adding a",
-    "reciter is one entry here — plus its host in the media-src CSP directive in",
+    "reciter is one entry here - plus its host in the media-src CSP directive in",
     "docs/index.html, which only the web app needs.",
     "URLs are {server}NNN.mp3, three digits zero-padded.",
     "A reciter with an incomplete mushaf lists REAL surah numbers in `surahs`;",
-    "omit the key for a full 114."
+    "omit the key for a full 114.",
+    "`local` maps a surah number to a file under assets/audio/<id>/ that is served",
+    "from this repo INSTEAD of streaming - used where the streaming host does not",
+    "carry that surah at all. Same-origin, so it needs no media-src entry."
   ],
   "surah_names": [
     "الفاتحة",
@@ -159,11 +162,29 @@
         87,
         88,
         89,
+        90,
         96,
+        97,
         98,
-        100
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106
       ],
-      "note": "المصحف غير كامل - 31 سورة هي كل ما سُجّل"
+      "note": "المصحف غير كامل - 39 سورة هي كل ما توفر",
+      "local": {
+        "90": "090.m4a",
+        "97": "097.m4a",
+        "101": "101.m4a",
+        "102": "102.m4a",
+        "103": "103.m4a",
+        "104": "104.m4a",
+        "105": "105.m4a",
+        "106": "106.m4a"
+      }
     },
     {
       "id": "husr-warsh",

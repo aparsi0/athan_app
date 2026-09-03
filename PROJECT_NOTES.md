@@ -40,7 +40,7 @@ SSH is the durable alternative (`git remote set-url origin git@github.com:aparsi
 and bypasses the Keychain, token scopes and the Claude GitHub App entirely.
 Live at the **same URL** ~1 minute later (GitHub Pages, branch-based, serves `docs/` on `main` —
 no Actions workflow; the `gh` token lacks `workflow` scope). When changing HTML/CSS/JS, bump
-`CACHE_VERSION` in `docs/sw.js` (currently **v30**) so visitors' service workers refresh promptly.
+`CACHE_VERSION` in `docs/sw.js` (currently **v31**) so visitors' service workers refresh promptly.
 Tabs already open pick up changes on next reload; new visitors get it immediately.
 
 **Local preview:** `python3 -m http.server 8734 --directory docs` (or `.claude/launch.json` →
@@ -81,7 +81,7 @@ athan_app/
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
     ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (349 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v30                    (104 lines)
+    ├── sw.js                  service worker — cache version v31                    (104 lines)
     ├── README.md              web-app-specific readme
     ├── css/style.css          full site styling, responsive, RTL Arabic support     (382 lines)
     ├── js/
@@ -455,6 +455,23 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     The window end is a scheduled event at Azkar + N; the start is the Fajr chain finishing.
     Verified to match the web app's computation exactly: Sep 02 05:35–10:14, Dec 21 06:05–09:13,
     Jun 21 04:31–10:17.
+
+26. **محمد رفعت: 8 surahs served from the repo (2026-09-03).** The user had a downloaded
+    رفعت collection. Only part of it was worth hosting, and the arithmetic decided it:
+    of 14 complete surahs, **6 already stream from mp3quran** (58.5 MB of duplication) and
+    **8 do not exist there at all** — البلد، القدر، القارعة، التكاثر، العصر، الهمزة، الفيل، قريش.
+    Those 8 are 19.3 MB, so they now live in `docs/assets/audio/refat/` and رفعت goes from
+    31 to **39 surahs**. The other 302 MB (17 verse-range excerpts, plus duplicates) stays
+    off the site: GitHub Pages caps a published site at 1 GB and git keeps binaries forever.
+    Site total is now 86 MB.
+
+    `reciters.json` gained an optional **`local`** map (surah number -> filename under
+    `assets/audio/<id>/`). A surah listed there is served from the repo instead of streamed;
+    everything else still streams. Same-origin, so `media-src` needed no change.
+
+    **Beware the folder's contents.** It is named for رفعت but has since acquired
+    مصطفى إسماعيل recordings too, and one recital dated **Tanta 1961** — which cannot be
+    رفعت, who died in 1950. Always check attribution before filing anything under a sheikh.
 
 ## 8. Possible future ideas (not requested yet)
 
