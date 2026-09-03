@@ -97,11 +97,17 @@ const Reciters = {
     return reciterSurahs(this.active()).map((n) => SURAH_NAMES[n - 1]);
   },
 
-  /** Position i in THIS reciter's list -> its real surah number -> a URL. */
+  /** Position i in THIS reciter's list -> its real surah number -> a URL.
+   *  A surah listed in `local` is served from this repo instead of streamed —
+   *  that is how محمد رفعت's 8 extra surahs work, since the streaming host
+   *  does not carry them at all. */
   srcFor(i) {
-    const nums = reciterSurahs(this.active());
+    const reciter = this.active();
+    const nums = reciterSurahs(reciter);
     const n = nums[i] != null ? nums[i] : nums[0];
-    return this.active().server + String(n).padStart(3, '0') + '.mp3';
+    const local = reciter.local && reciter.local[String(n)];
+    if (local) return `assets/audio/${reciter.id}/${local}`;
+    return reciter.server + String(n).padStart(3, '0') + '.mp3';
   },
 
   _syncSelect() {
