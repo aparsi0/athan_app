@@ -18,8 +18,14 @@
   <key>RunAtLoad</key>
   <true/>
 
+  <!-- Headless has no menu bar and so no Quit, but the same reasoning holds
+       for `launchctl kill`: a deliberate stop should stay stopped, a crash
+       should not. -->
   <key>KeepAlive</key>
-  <true/>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
 
   <key>StandardOutPath</key>
   <string>__STDOUT_LOG__</string>

@@ -5,6 +5,7 @@
 #   ./setup.sh                  install or update, then build the menu-bar app
 #   ./setup.sh --clean          throw away this app's Python environment first
 #   ./setup.sh --autostart      also start the app automatically at login
+#   ./setup.sh --no-autostart   stop that, and quit it now (nothing else runs)
 #   ./setup.sh --no-app         set up Python only; skip building the .app
 #   ./setup.sh --help
 #
@@ -29,16 +30,18 @@ cd "$APP_DIR"
 
 CLEAN=0
 AUTOSTART=0
+STOP_AUTOSTART=0
 BUILD_APP=1
 MIN_PY_MINOR=10          # 3.10+
 
 for arg in "$@"; do
   case "$arg" in
     --clean)     CLEAN=1 ;;
-    --autostart) AUTOSTART=1 ;;
+    --autostart)    AUTOSTART=1 ;;
+    --no-autostart) STOP_AUTOSTART=1 ;;
     --no-app)    BUILD_APP=0 ;;
     -h|--help)
-      sed -n '3,9p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '3,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       cat <<'HELP'
 Shared programs (Homebrew, Python, VLC, ffmpeg) are upgraded, never removed.
 build/ and dist/ are rebuilt every run. --clean also deletes .venv, so every
@@ -61,6 +64,20 @@ case "$OSTYPE" in
 esac
 
 [[ $EUID -eq 0 ]] && die "Do not run this with sudo. It installs into your own account."
+
+if [[ $STOP_AUTOSTART -eq 1 ]]; then
+  [[ "$OS" == macos ]] || die "--no-autostart is macOS-only."
+  step "Turning off auto-start"
+  target="gui/$(id -u)/com.apa.athan-app"
+  launchctl bootout "$target" >/dev/null 2>&1 || true
+  # bootout alone is not enough: the plist stays in ~/Library/LaunchAgents and
+  # would load again at the next login. disable is the part that persists.
+  launchctl disable "$target" >/dev/null 2>&1 || true
+  ok "Stopped, and it will not come back at login."
+  printf '\n  Open it yourself:  open /Applications/AthanApp.app\n'
+  printf '  Turn it back on:   ./setup.sh --autostart\n\n'
+  exit 0
+fi
 
 printf '\n🕌  Athan App setup — %s\n' "$OS"
 printf '    %s\n' "$APP_DIR"
@@ -296,6 +313,7 @@ printf '\n\033[1m🎉 Done.\033[0m\n\n'
 if [[ "$OS" == macos && $BUILD_APP -eq 1 ]]; then
   printf '  Open the app:      open /Applications/AthanApp.app\n'
   printf '  Start at login:    ./setup.sh --autostart\n'
+  printf '  Stop that:         ./setup.sh --no-autostart\n'
 else
   printf '  Run it:            .venv/bin/python main.py\n'
   printf '  Without a screen:  .venv/bin/python main_headless.py\n'
