@@ -51,6 +51,10 @@ class AthanApp:
         self.audio_manager = None
         self.quran_player = None
         self._quran_was_displaced = False
+        # Set when Stop is pressed in the dashboard, so the several catch-up
+        # paths into _start_morning_quran do not immediately undo it. Cleared
+        # when the window ends, or when playback is asked for again.
+        self._quran_stopped_by_user = False
         self.tray_manager = None
         self.location_service = None
         
@@ -294,6 +298,8 @@ class AthanApp:
                 return False
             if self.quran_player.is_playing:
                 return False
+            if self._quran_stopped_by_user:
+                return False
             # PrayerAudioManager has no is_playing of its own; the underlying
             # AudioPlayer does, and that is what actually holds the floor.
             player = getattr(self.audio_manager, 'audio_player', None)
@@ -325,6 +331,7 @@ class AthanApp:
                 self.quran_player.stop()
                 logger.info("🕌 Morning Quran window has ended")
             self._quran_was_displaced = False
+            self._quran_stopped_by_user = False
         except Exception as exc:
             logger.error("Could not stop the morning Quran: %s", exc)
 
@@ -742,7 +749,13 @@ class AthanApp:
             logger.error("Error reloading config: %s", exc)
 
     def _config_reload_watcher(self):
-        """Background thread: poll for the settings-saved sentinel file."""
+        """Background thread: poll for the settings sentinel and for commands
+        from the dashboard window, which runs as a separate process.
+
+        Half a second rather than two: a Play button that takes two seconds to
+        respond reads as broken. Two stat() calls per second cost nothing.
+        """
+        from core import app_commands
         from utils.app_paths import get_config_dir
         sentinel = get_config_dir() / ".reload_request"
         while self.is_running:
@@ -750,9 +763,68 @@ class AthanApp:
                 if sentinel.exists():
                     sentinel.unlink(missing_ok=True)
                     self._reload_config_from_disk()
+                command = app_commands.take()
+                if command:
+                    self._handle_command(command)
             except Exception as exc:
                 logger.error("Reload watcher error: %s", exc)
-            time.sleep(2)
+            time.sleep(0.5)
+
+    def _handle_command(self, command: dict):
+        """Act on one dashboard command. Never raises — this runs on the
+        watcher thread, and losing it would also lose config reloading."""
+        action = command.get("action")
+        try:
+            if action == "play_recital":
+                if not (self.quran_player and self.quran_player.available):
+                    logger.warning("play_recital: the Quran player is not available")
+                    return
+                reciter_id = command.get("reciter_id")
+                if reciter_id:
+                    self.quran_player.select_reciter(reciter_id)
+                # An on-demand recital outranks whatever the morning window was
+                # playing, but never prayer audio.
+                player = getattr(self.audio_manager, 'audio_player', None)
+                if player is not None and getattr(player, 'is_playing', False):
+                    logger.info("play_recital: prayer audio has the floor; ignoring")
+                    return
+                index = int(command.get("index", 0))
+                self._quran_stopped_by_user = False
+                if self.quran_player.play_recital(index):
+                    logger.info(
+                        "🕌 Playing a recital on request: %s",
+                        self.quran_player.current_label(),
+                    )
+            elif action == "play_mushaf":
+                if not (self.quran_player and self.quran_player.available):
+                    logger.warning("play_mushaf: the Quran player is not available")
+                    return
+                reciter_id = command.get("reciter_id")
+                if reciter_id:
+                    self.quran_player.select_reciter(reciter_id)
+                player = getattr(self.audio_manager, 'audio_player', None)
+                if player is not None and getattr(player, 'is_playing', False):
+                    logger.info("play_mushaf: prayer audio has the floor; ignoring")
+                    return
+                self._quran_stopped_by_user = False
+                if self.quran_player.play():
+                    logger.info(
+                        "🕌 Playing the mushaf on request: %s",
+                        self.quran_player.current_label(),
+                    )
+            elif action == "stop_quran":
+                if self.quran_player:
+                    self.quran_player.stop()
+                    # Do not let the morning window immediately restart it: the
+                    # user pressed Stop, and _start_morning_quran is called from
+                    # several catch-up paths.
+                    self._quran_was_displaced = False
+                    self._quran_stopped_by_user = True
+                    logger.info("🕌 Quran stopped from the dashboard")
+            else:
+                logger.warning("Unknown dashboard command: %s", action)
+        except Exception as exc:
+            logger.error("Command %s failed: %s", action, exc)
 
 
 def signal_handler(signum, frame):

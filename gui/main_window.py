@@ -340,14 +340,19 @@ class DashboardWindow:
         self._tab_indices["settings"] = 1
         self._build_settings_tab(settings_tab)
 
+        recitals_tab = tk.Frame(self.notebook, bg=PALETTE["bg"])
+        self.notebook.add(recitals_tab, text="تلاوات")
+        self._tab_indices["recitals"] = 2
+        self._build_recitals_tab(recitals_tab)
+
         audio_tab = tk.Frame(self.notebook, bg=PALETTE["bg"])
         self.notebook.add(audio_tab, text="Audio")
-        self._tab_indices["audio"] = 2
+        self._tab_indices["audio"] = 3
         self._build_audio_tab(audio_tab)
 
         about_tab = tk.Frame(self.notebook, bg=PALETTE["bg"])
         self.notebook.add(about_tab, text="About")
-        self._tab_indices["about"] = 3
+        self._tab_indices["about"] = 4
         self._build_about_tab(about_tab)
 
     # ----- Today tab -----------------------------------------------------
@@ -1265,6 +1270,229 @@ class DashboardWindow:
                 cm.set("audio_settings.quran_library_path", folder)
 
         return errors
+
+
+    # ----- تلاوات tab ----------------------------------------------------
+
+    def _build_recitals_tab(self, parent: tk.Frame):
+        """The local recitals, playable on demand.
+
+        This window is a separate process from the daemon that owns the audio,
+        so the buttons do not play anything themselves: they leave a command
+        file that the daemon picks up. The status line below reports whether it
+        was picked up, which is also how you learn the app is not running.
+        """
+        wrapper = tk.Frame(parent, bg=PALETTE["bg"])
+        wrapper.pack(fill="both", expand=True, padx=16, pady=16)
+
+        self._recital_library = self._load_recital_library()
+        self._recital_reciters = sorted(
+            ((rid, info) for rid, info in self._recital_library.items()
+             if info["recitals"]),
+            key=lambda pair: (-len(pair[1]["recitals"]), pair[0]),
+        )
+
+        if not self._recital_reciters:
+            tk.Label(
+                wrapper,
+                text=("No local recitals were found.\n\n"
+                      "Point Settings → Local Quran Recordings at a folder of\n"
+                      "recordings. Files that are one complete surah join the\n"
+                      "mushaf; verse ranges and multi-surah sessions appear here."),
+                bg=PALETTE["bg"], fg=PALETTE["muted"],
+                font=("SF Pro Text", 11), justify="left",
+            ).pack(anchor="w", pady=20)
+            return
+
+        tk.Label(
+            wrapper,
+            text=("Recordings that are not one complete surah — verse ranges and live\n"
+                  "sessions spanning several surahs. Playing one leaves the mushaf where\n"
+                  "it was, and prayer audio still interrupts everything."),
+            bg=PALETTE["bg"], fg=PALETTE["muted"],
+            font=("SF Pro Text", 10), justify="left", anchor="w",
+        ).pack(fill="x", pady=(0, 12))
+
+        # --- reciter picker ---
+        top = tk.Frame(wrapper, bg=PALETTE["bg"])
+        top.pack(fill="x", pady=(0, 10))
+        tk.Label(
+            top, text="Sheikh", bg=PALETTE["bg"], fg=PALETTE["text_dark"],
+            font=("SF Pro Text", 11), anchor="w",
+        ).pack(side="left", padx=(0, 8))
+
+        labels = [self._recital_reciter_label(rid, info)
+                  for rid, info in self._recital_reciters]
+        self._recital_reciter_var = tk.StringVar(value=labels[0])
+        ttk.OptionMenu(
+            top, self._recital_reciter_var, labels[0], *labels,
+            command=lambda _v: self._refresh_recital_list(),
+        ).pack(side="left")
+
+        # --- the list ---
+        list_frame = tk.Frame(wrapper, bg=PALETTE["card"], padx=2, pady=2)
+        list_frame.pack(fill="both", expand=True)
+        scrollbar = tk.Scrollbar(
+            list_frame, bg=PALETTE["card_alt"], troughcolor=PALETTE["card"],
+            activebackground=PALETTE["muted"], highlightthickness=0, borderwidth=0,
+        )
+        scrollbar.pack(side="right", fill="y")
+        self._recital_list = tk.Listbox(
+            list_frame,
+            bg=PALETTE["card"], fg=PALETTE["text_dark"],
+            selectbackground=PALETTE["accent"], selectforeground=PALETTE["on_accent"],
+            highlightthickness=0, borderwidth=0, activestyle="none",
+            font=("SF Pro Text", 12), yscrollcommand=scrollbar.set,
+        )
+        self._recital_list.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self._recital_list.yview)
+        self._recital_list.bind("<Double-Button-1>", lambda _e: self._play_selected_recital())
+
+        # --- buttons ---
+        buttons = tk.Frame(wrapper, bg=PALETTE["bg"])
+        buttons.pack(fill="x", pady=(10, 0))
+        self._accent_button(buttons, "▶  Play recital", self._play_selected_recital)
+        self._plain_button(buttons, "Play mushaf", self._play_mushaf)
+        self._plain_button(buttons, "Stop", self._stop_quran)
+
+        self._recital_status = tk.Label(
+            wrapper, text="", bg=PALETTE["bg"], fg=PALETTE["muted"],
+            font=("SF Pro Text", 10), justify="left", anchor="w", wraplength=640,
+        )
+        self._recital_status.pack(fill="x", pady=(10, 0))
+
+        self._refresh_recital_list()
+
+    def _load_recital_library(self) -> dict:
+        """Index the same folder the player will. Never raises: a bad folder
+        must not stop the dashboard from opening."""
+        try:
+            from core.quran_library import scan_library
+            from core.quran_player import DEFAULT_LIBRARY_DIRS
+
+            configured = ((self.config.get("audio_settings", {}) or {})
+                          .get("quran_library_path", "") or "")
+            for candidate in ([configured] if configured else list(DEFAULT_LIBRARY_DIRS)):
+                if not candidate:
+                    continue
+                path = os.path.expanduser(candidate)
+                if os.path.isdir(path):
+                    return scan_library(path)
+        except Exception:
+            pass
+        return {}
+
+    def _recital_reciter_label(self, reciter_id: str, info: dict) -> str:
+        if not hasattr(self, "_recital_sheikhs"):
+            try:
+                from core.quran_player import load_reciters
+                _names, reciters = load_reciters()
+            except Exception:
+                reciters = []
+            self._recital_sheikhs = {
+                r.get("id"): r.get("sheikh") or r.get("id") for r in reciters
+            }
+        name = self._recital_sheikhs.get(reciter_id, reciter_id)
+        return f"{name}  ({len(info['recitals'])})"
+
+    def _selected_reciter(self):
+        """(reciter_id, info) for the picker's current value."""
+        chosen = self._recital_reciter_var.get()
+        for reciter_id, info in self._recital_reciters:
+            if self._recital_reciter_label(reciter_id, info) == chosen:
+                return reciter_id, info
+        return self._recital_reciters[0]
+
+    def _refresh_recital_list(self):
+        _reciter_id, info = self._selected_reciter()
+        self._recital_list.delete(0, tk.END)
+        for item in info["recitals"]:
+            self._recital_list.insert(tk.END, "  " + item["title"])
+        if info["recitals"]:
+            self._recital_list.selection_set(0)
+
+    # --- talking to the daemon ---
+
+    def _send_command(self, action: str, waiting: str, **fields):
+        try:
+            from core import app_commands
+        except Exception as exc:
+            self._set_recital_status(f"Could not reach the app: {exc}", PALETTE["warn"])
+            return
+        if not app_commands.send(action, **fields):
+            self._set_recital_status(
+                "Could not write the command file — check ~/.athan_app is writable.",
+                PALETTE["warn"],
+            )
+            return
+        self._set_recital_status(waiting, PALETTE["muted"])
+        # The daemon deletes the file when it acts on it. Still there after a
+        # couple of seconds means nothing is listening.
+        self.root.after(2500, lambda: self._confirm_command(action))
+
+    def _confirm_command(self, action: str):
+        try:
+            from core import app_commands
+            if app_commands.pending():
+                app_commands.clear()
+                self._set_recital_status(
+                    "The Athan app does not seem to be running, so nothing played. "
+                    "Start it from the menu bar and try again.",
+                    PALETTE["warn"],
+                )
+            else:
+                self._set_recital_status(
+                    {"stop_quran": "Stopped.",
+                     "play_mushaf": "Playing the mushaf."}.get(action, "Playing."),
+                    PALETTE["good"],
+                )
+        except Exception:
+            pass
+
+    def _set_recital_status(self, text: str, colour: str):
+        if getattr(self, "_recital_status", None) is not None:
+            self._recital_status.config(text=text, fg=colour)
+
+    def _play_selected_recital(self):
+        reciter_id, info = self._selected_reciter()
+        selection = self._recital_list.curselection()
+        if not selection:
+            self._set_recital_status("Pick a recital first.", PALETTE["warn"])
+            return
+        index = selection[0]
+        title = info["recitals"][index]["title"]
+        self._send_command(
+            "play_recital", f"Asking the app to play “{title}”…",
+            reciter_id=reciter_id, index=index,
+        )
+
+    def _play_mushaf(self):
+        reciter_id, _info = self._selected_reciter()
+        self._send_command(
+            "play_mushaf", "Asking the app to play the mushaf…",
+            reciter_id=reciter_id,
+        )
+
+    def _stop_quran(self):
+        self._send_command("stop_quran", "Asking the app to stop…")
+
+    def _accent_button(self, parent: tk.Frame, text: str, command):
+        tk.Button(
+            parent, text=text, command=command,
+            bg=PALETTE["accent"], fg=PALETTE["on_accent"],
+            activebackground=PALETTE["accent_soft"], activeforeground=PALETTE["on_accent"],
+            font=("SF Pro Text", 12, "bold"), relief="flat",
+            padx=18, pady=7, highlightthickness=0, borderwidth=0,
+        ).pack(side="left", padx=(0, 8))
+
+    def _plain_button(self, parent: tk.Frame, text: str, command):
+        tk.Button(
+            parent, text=text, command=command,
+            bg=PALETTE["card_alt"], fg=PALETTE["text_dark"],
+            activebackground=PALETTE["card"], activeforeground=PALETTE["text_dark"],
+            font=("SF Pro Text", 12), relief="flat",
+            padx=16, pady=7, highlightthickness=0, borderwidth=0,
+        ).pack(side="left", padx=(0, 8))
 
     # ----- Audio tab -----------------------------------------------------
 
