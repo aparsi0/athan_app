@@ -64,9 +64,12 @@ athan_app/
 ├── export_for_sharing.sh
 ├── config/settings.py                    desktop ConfigManager (JSON config, defaults)
 ├── core/                                 desktop engine
-│   ├── audio_player.py                     VLC playback
+│   ├── audio_player.py                     VLC playback (athan chain)
+│   ├── app_commands.py                     dashboard → daemon command file
 │   ├── location_service.py                 geolocation
 │   ├── prayer_times.py                     Aladhan API client
+│   ├── quran_library.py                    indexes a folder of local recordings
+│   ├── quran_player.py                     second VLC player: mushaf + تلاوات
 │   └── scheduler.py                        event scheduling
 ├── gui/                                  desktop Tk UI (main window, settings, tray icon)
 ├── utils/                                app_paths.py, helpers.py
@@ -74,16 +77,11 @@ athan_app/
 │   ├── com.apa.athan-menubar.plist / install_menubar_agent.sh   ← recommended
 │   └── com.apa.athan-app.plist / install_launch_agent.sh        ← headless
 ├── packaging/                            PyInstaller build scripts (macOS .app, Windows)
-├── assets/audio/*.m4a                    11 athan/duaa/azkar recordings (~63 MB, source of truth;
-│                                          docs/assets/audio/ is a copy used by the website)
-├── demo/                                 design playground, NOT deployed (kept for reference)
-│   ├── index.html                          early living-scene prototypes
-│   └── candidates/                         theme-photo comparison pages
 │
 └── docs/                     ★ THE LIVE WEBSITE — GitHub Pages serves this folder ★
     ├── index.html             page shell: sound/location gate, 8 tabs, all panels   (349 lines)
     ├── manifest.webmanifest   PWA metadata
-    ├── sw.js                  service worker — cache version v31                    (104 lines)
+    ├── sw.js                  service worker — cache version v32                    (104 lines)
     ├── README.md              web-app-specific readme
     ├── css/style.css          full site styling, responsive, RTL Arabic support     (382 lines)
     ├── js/
@@ -96,8 +94,10 @@ athan_app/
     │   ├── reciters.js          ★ Quran tab — 4 mushafs, selector, endless rotation   (170)
     │   ├── audio-players.js     ★ Quran tabs 2 & 3 — المصحف المعلم + live Cairo radio  (444)
     │   └── app.js               wires everything, UI rendering, settings, Test Athan    (536)
-    └── assets/
-        ├── audio/*.m4a           same 11 recordings as desktop (~63 MB)
+    └── assets/                ★ THE ONLY COPY of the shared audio — see §Assets ★
+        ├── audio/*.m4a           the 11 athan/duaa/azkar recordings (~63 MB)
+        ├── audio/refat/*.m4a     8 محمد رفعت surahs mp3quran does not carry (~19 MB)
+        ├── reciters.json         the reciter table BOTH apps read
         ├── icons/                 PWA icons (SVG + 180/192/512 PNG)
         └── sky_01.jpg … sky_20.jpg   the 20 painted day/night frames (~3.6 MB total)
 ```
@@ -476,6 +476,78 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     **Beware the folder's contents.** It is named for رفعت but has since acquired
     مصطفى إسماعيل recordings too, and one recital dated **Tanta 1961** — which cannot be
     رفعت, who died in 1950. Always check attribution before filing anything under a sheikh.
+
+27. **The local recordings, on the desktop app (2026-09-03).** The same folder, indexed
+    properly this time. `core/quran_library.py` sorts its 36 files into two kinds that are
+    *not* interchangeable: 14 complete surahs, which can stand in for the streamed copy,
+    and 22 **تلاوات** — 17 verse ranges and 5 multi-surah live sessions — which have no
+    single surah number and would corrupt the numbered mushaf if mixed in. Attribution
+    reads the file NAME, never the folder name: 4 of the 36 are مصطفى إسماعيل sitting in
+    a folder named for رفعت.
+
+    The desktop track list is the **union** of what mp3quran serves and what is on disk, so
+    a local file for a surah the host lacks is an addition, not a replacement; a local file
+    wins when both exist. Settings gained a *Local Quran Recordings* section — the folder
+    plus a live readout of who contributed what.
+
+    **macOS stores file names decomposed (NFD).** A literal `إ` written in a `.py` file does
+    not match the same letter coming off disk. Two مصطفى files were silently unattributed
+    until the scanner composed first. `tests/test_quran_library.py` keeps the real names in
+    NFD so it cannot come back.
+
+    Recitals sort by **surah, then first verse** — a string sort put `من 128 - 139 النساء`
+    before `من 28 - 51 آل عمران`, wrong twice over (1 < 2, and النساء precedes آل عمران in
+    the Arabic alphabet but follows it in the mushaf).
+
+28. **A تلاوات tab, and how the dashboard talks to the daemon (2026-09-03).** The dashboard
+    window is a **separate process** — the tray spawns it, because Tk on macOS insists on the
+    main thread — so its buttons cannot touch the daemon's `QuranPlayer`. `core/app_commands.py`
+    is a one-shot JSON file the daemon's watcher thread consumes and *deletes*. Deleting on
+    read is what makes it safe: a command fires exactly once; one older than 30 s is dropped
+    rather than starting audio nobody still wants; and the file still being there after two
+    seconds is how the window learns the app is not running, which it then says. The watcher
+    poll went 2 s → 0.5 s, because a Play button that answers in two seconds reads as broken.
+
+    Stop sets a latch. `_start_morning_quran` is reached from several catch-up paths and
+    would otherwise undo a Stop within seconds. It clears at the window's end.
+
+29. **One command installs everything: `./setup.sh` (2026-09-03).** The README asked for
+    ~40 manual steps across four machine sections, and the old `install.sh` could not have
+    completed any of them on a Mac — `grep -oP` (GNU-only), copying the checkout into
+    `~/.athan_app` (the *config* dir), writing launchers to `~/.local/bin` (absent on macOS),
+    and never installing `python-tk`. It is now a shim onto `setup.sh`.
+
+    Idempotent by design: the same command is the install, the update and the repair.
+    Shared programs (Homebrew, Python, VLC, ffmpeg) are **upgraded, never uninstalled** —
+    removing VLC to reinstall it takes it from everything else on the machine. `build/` and
+    `dist/` are rebuilt every run; `--clean` adds `.venv`.
+
+    The interpreter choice is the part that matters: newest-first, accepted only if 3.10+
+    **and** it can `import tkinter`, else install `python-tk@<series>` and retry. Written for
+    **bash 3.2**, which is what macOS still ships — no `sort -V`, no empty-array expansion
+    under `set -u`. shellcheck clean.
+
+30. **The audio was stored twice; `reciters.json` was never bundled (2026-09-03).**
+    `assets/audio/` and `docs/assets/audio/` held **11 byte-identical files, ~63 MB each**,
+    with nothing keeping them in sync — a new athan added to one would never reach the other.
+    `docs/` is the copy that cannot move (GitHub Pages serves only from there), so it became
+    the only copy. `assets/` is gone.
+
+    Nothing else changed: the PyInstaller spec places the files at `assets/...` *inside* the
+    bundle, so every path in `config/settings.py` is untouched. `utils/app_paths.py` grew
+    `get_asset_roots()` / `resolve_asset()` — config dir → bundle → project → project/docs —
+    and the three places that hand-built `get_bundle_root() / "assets" / ...` now go through it.
+
+    **The bug this uncovered:** the spec bundled only `assets/`, which never contained
+    `reciters.json`. So in the built `.app` — the one launchd actually starts — `load_reciters()`
+    returned empty, `QuranPlayer.available` was False, and **every Quran feature silently did
+    nothing**, morning window included. It worked when run from source, which is why it went
+    unnoticed. The spec now bundles the reciter table explicitly, and only what the desktop
+    needs: the 11 recordings and the icons, not the 20 sky photographs.
+
+    Also removed: `demo/` (3.7 MB of Unsplash candidates and mask experiments from choosing
+    the sky, referenced by nothing). Note that deleting files does not shrink `.git`, which is
+    ~104 MB of history; only a history rewrite would, and that changes every SHA.
 
 ## 8. Possible future ideas (not requested yet)
 

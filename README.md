@@ -337,23 +337,35 @@ Edit the configuration file at `~/.athan_app/config.json`:
 
 ### Audio File Names
 
-- Default Athan fallback: place your file at `assets/audio/Azansoundtrack.m4a`
-- Fajr Athan: place your file at `assets/audio/fajr_athan.m4a`
-- Dhuhr Athan: place your file at `assets/audio/dhuhr_athan.m4a`
-- Asr Athan: place your file at `assets/audio/asr_athan.m4a`
-- Maghrib Athan: place your file at `assets/audio/maghrib_athan.m4a`
-- Isha Athan: place your file at `assets/audio/isha_athan.m4a`
-- Friday 3 hours before Dhuhr: place your file at `assets/audio/Surat_AlKahf.m4a`
-- After each prayer: place your file at `assets/audio/Duaa.m4a`
-- Pre-prayer reminder: place your file at `assets/audio/Woduaa.m4a`
-- Morning audio: place your file at `assets/audio/morning_audio.m4a` and it will play 30 minutes before sunrise
-- Night audio: place your file at `assets/audio/night_audio.m4a` and it will play 30 minutes after Asr
+To replace any sound with your own, drop a file with the matching name into
+`~/.athan_app/assets/audio/`. That folder is searched **first**, so your copy
+wins over the bundled one without editing anything or rebuilding the app, and
+it survives every update.
 
-During development, all of these go in:
+| Sound | File name |
+| --- | --- |
+| Default athan (fallback) | `Azansoundtrack.m4a` |
+| Fajr | `fajr_athan.m4a` |
+| Dhuhr | `dhuhr_athan.m4a` |
+| Asr | `asr_athan.m4a` |
+| Maghrib | `maghrib_athan.m4a` |
+| Isha | `isha_athan.m4a` |
+| Friday, 3 h before Dhuhr | `Surat_AlKahf.m4a` |
+| After each prayer | `Duaa.m4a` |
+| Pre-prayer reminder | `Woduaa.m4a` |
+| Morning azkar | `morning_audio.m4a` |
+| Night azkar | `night_audio.m4a` |
 
-```text
-<project-folder>/assets/audio/
+```bash
+mkdir -p ~/.athan_app/assets/audio
+cp ~/Downloads/my_athan.m4a ~/.athan_app/assets/audio/fajr_athan.m4a
 ```
+
+The recordings that ship with the app live in `docs/assets/audio/`. That is one
+folder, not two: the website has to serve from `docs/`, so rather than keep a
+second identical copy for the desktop app, both read the same files. Editing
+them there changes the website as well, which is why an override in
+`~/.athan_app/` is the right way to change only your own athan.
 
 For installed or packaged use, you can also place overrides in:
 

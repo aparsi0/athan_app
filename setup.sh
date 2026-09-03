@@ -250,7 +250,7 @@ else
   warn "you have the arm64 VLC build, not the Intel one."
 fi
 
-for suite in tests/test_quran_library.py tests/test_app_commands.py; do
+for suite in tests/*.py; do
   [[ -f "$suite" ]] || continue
   if .venv/bin/python "$suite" >/dev/null 2>&1; then
     ok "$(basename "$suite") passed"

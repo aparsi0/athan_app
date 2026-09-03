@@ -211,9 +211,10 @@ class SystemTrayManager:
         """
         try:
             # Try to load custom icon if available
-            icon_path = get_bundle_root() / 'assets' / 'icons' / 'tray_icon.png'
-            
-            if icon_path.exists():
+            from utils.app_paths import resolve_asset
+            icon_path = resolve_asset('assets/icons/tray_icon.png')
+
+            if icon_path is not None:
                 return Image.open(icon_path)
             else:
                 # Create a simple mosque/crescent icon programmatically
