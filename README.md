@@ -34,333 +34,135 @@ keeps working whether or not a browser is open.
 
 ## 🚀 Installation
 
-### Before You Start
+One command. It works the first time and every time after — the same command
+installs, updates, and repairs.
 
-You need these things on any computer:
-
-- Python 3.10 or newer
-- VLC Media Player
-- The files from this project
-- Internet access so the app can detect location and fetch prayer times
-
-### iMac / MacBook Intel
-
-1. Open `Terminal`.
-2. Check whether Python 3 is already installed:
-   ```bash
-   python3 --version
-   ```
-3. If that says command not found, install Homebrew:
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-4. Install Python **and Tkinter**:
-   ```bash
-   brew install python
-   brew install python-tk
-   ```
-   > ⚠️ **Do not skip `python-tk`.** Homebrew ships Python without Tkinter — it is a
-   > separate formula. Without it the app still runs and the menu-bar icon still
-   > appears, but **clicking it opens nothing**, because the dashboard window dies on
-   > `import tkinter`. If you use a specific version, match it: `brew install python-tk@3.14`.
-   >
-   > Check it worked:
-   > ```bash
-   > python3 -c "import tkinter; print(tkinter.TkVersion)"
-   > ```
-5. Install VLC:
-   ```bash
-   brew install --cask vlc
-   ```
-6. Go to the project folder:
-   ```bash
-   cd /path/to/athan_app
-   ```
-7. Create a virtual environment:
-   ```bash
-   python3 -m venv .venv
-   ```
-8. Activate it:
-   ```bash
-   source .venv/bin/activate
-   ```
-9. Install the Python packages:
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-10. Start the app:
-   ```bash
-   python3 main_headless.py
-   ```
-11. To keep your Mac awake while it runs:
-   ```bash
-   caffeinate -i python3 main_headless.py
-   ```
-
-### MacBook M1 / M2 / M3
-
-1. Open `Terminal`.
-2. Install Homebrew if you do not already have it:
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-3. Add Homebrew to your shell if the installer tells you to. On Apple Silicon this is usually:
-   ```bash
-   echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-   eval "$(/opt/homebrew/bin/brew shellenv)"
-   ```
-4. Install Python **and Tkinter**:
-   ```bash
-   brew install python
-   brew install python-tk
-   ```
-   > ⚠️ **Do not skip `python-tk`.** Homebrew ships Python without Tkinter — it is a
-   > separate formula. Without it the app still runs and the menu-bar icon still
-   > appears, but **clicking it opens nothing**, because the dashboard window dies on
-   > `import tkinter`. If you use a specific version, match it: `brew install python-tk@3.14`.
-   >
-   > Check it worked:
-   > ```bash
-   > python3 -c "import tkinter; print(tkinter.TkVersion)"
-   > ```
-5. Install VLC:
-   ```bash
-   brew install --cask vlc
-   ```
-   > ⚠️ **Apple Silicon note:** VLC must be the **Apple Silicon (arm64)** build.
-   > If VLC was previously downloaded manually, it may be the Intel version, and the
-   > app will later fail with `OSError: dlopen ... libvlccore.dylib ... incompatible
-   > architecture (have 'x86_64', need 'arm64')`. Fix it like this:
-   > ```bash
-   > sudo rm -rf /Applications/VLC.app
-   > brew install --cask vlc
-   > file /Applications/VLC.app/Contents/MacOS/lib/libvlccore.dylib   # must say arm64
-   > ```
-   > (If downloading from videolan.org instead, choose the "macOS — Apple Silicon" installer.)
-6. Go to the project folder:
-   ```bash
-   cd /path/to/athan_app
-   ```
-7. Create a virtual environment:
-   ```bash
-   python3 -m venv .venv
-   ```
-8. Activate it:
-   ```bash
-   source .venv/bin/activate
-   ```
-9. Install the Python packages:
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-10. Start the app:
-   ```bash
-   python3 main_headless.py
-   ```
-11. To keep the Mac awake:
-   ```bash
-   caffeinate -i python3 main_headless.py
-   ```
-
-### 🌙 Install as a Menu-Bar App with Auto-Start (macOS — recommended)
-
-This is the full desktop experience: a standalone app with the **green crescent
-icon in the menu bar** (top-right of the screen) that **starts automatically every
-time you turn on your Mac**, with the Mac kept awake so no prayer is ever missed.
-
-**Step 1 — Prerequisites** (once):
-
-1. Install VLC — on Apple Silicon it must be the **arm64** build (see the warning in the M1/M2/M3 section above):
-   ```bash
-   brew install --cask vlc
-   ```
-2. Have this project folder somewhere permanent (e.g. `~/Desktop/athan_app`) — the auto-start points at it, so don't move it afterwards.
-
-**Step 2 — Build the app** (once, ~2 minutes):
+### macOS and Linux
 
 ```bash
-cd /path/to/athan_app
-chmod +x packaging/build_macos_app.sh
-./packaging/build_macos_app.sh
+cd ~/Desktop/athan_app
+./setup.sh
 ```
 
-This creates `dist/AthanApp.app` (the script also creates the virtual environment and installs everything it needs).
+That is the whole thing. It installs anything missing (Homebrew, Python,
+Tkinter, VLC, ffmpeg), upgrades anything out of date, creates the Python
+environment, runs the test suite, builds `AthanApp.app`, and copies it to
+`/Applications`.
 
-**Step 3 — First launch** (Gatekeeper approval, once):
-
-1. In Finder, open the `dist` folder inside the project.
-2. **Right-click** `AthanApp.app` → **Open** → confirm **Open** in the dialog.
-   (A normal double-click may be blocked the first time because the app isn't signed with an Apple developer certificate. If macOS still refuses: System Settings → Privacy & Security → scroll down → **Open Anyway**.)
-3. The **green crescent icon** appears in the menu bar. Right-click it to see the next prayer, today's schedule, test the audio, or quit.
-
-**Step 4 — Auto-start at every login, with the Mac kept awake:**
+Starting from nothing, with no copy of the project yet:
 
 ```bash
-chmod +x macos/install_menubar_agent.sh
-./macos/install_menubar_agent.sh
+git clone https://github.com/aparsi0/athan_app.git ~/Desktop/athan_app
+cd ~/Desktop/athan_app && ./setup.sh
 ```
 
-This installs a launch agent that runs the app inside `caffeinate -dims`, which prevents the system, display and disks from sleeping — so athans fire even if you leave the Mac untouched all day. (If you'd rather let the **display** sleep while the athan keeps working, edit `caffeinate -dims` to `caffeinate -ims` in `macos/com.apa.athan-menubar.plist` and re-run the installer.)
-
-**Step 5 — Verify:**
-
-```bash
-launchctl print gui/$(id -u)/com.apa.athan-app | head   # state should say: running
-```
-
-…and the green crescent should be in the menu bar. Restart the Mac once to confirm it comes back by itself.
-
-**Managing it:**
-
-```bash
-# Restart the app
-launchctl kickstart -k gui/$(id -u)/com.apa.athan-app
-
-# Stop and remove auto-start
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.apa.athan-app.plist
-rm ~/Library/LaunchAgents/com.apa.athan-app.plist
-
-# Logs
-tail -f ~/.athan_app/launchd.stdout.log
-```
-
-Note: this and the headless agent below share the same agent name, so installing one replaces the other — you'll never get two athans playing at once.
-
-### Run Automatically on macOS with launchd (headless — no menu-bar icon)
-
-If you want the app to keep running without keeping Terminal open, use the included macOS launch agent.
-
-1. Go to the project folder:
-   ```bash
-   cd /path/to/athan_app
-   ```
-2. Make the installer executable:
-   ```bash
-   chmod +x macos/install_launch_agent.sh
-   ```
-3. Install and start the launch agent:
-   ```bash
-   ./macos/install_launch_agent.sh
-   ```
-4. Verify it is loaded:
-   ```bash
-   launchctl print gui/$(id -u)/com.apa.athan-app
-   ```
-5. Check launch-agent logs if needed:
-   ```bash
-   tail -f ~/.athan_app/launchd.stdout.log
-   tail -f ~/.athan_app/launchd.stderr.log
-   ```
-
-Restart the launch agent:
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.apa.athan-app
-```
-
-Stop and remove the launch agent:
-
-```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.apa.athan-app.plist
-rm ~/Library/LaunchAgents/com.apa.athan-app.plist
-```
+If Terminal says `permission denied`, run `chmod +x setup.sh` once and try again.
 
 ### Windows 10 / 11
 
-1. Install Python from `https://www.python.org/downloads/windows/`
-2. During installation, check `Add Python to PATH`.
-3. Install VLC from `https://www.videolan.org/vlc/`
-4. Open `Command Prompt` or `PowerShell`.
-5. Go to the project folder. Example:
-   ```powershell
-   cd C:\Users\YourName\Desktop\athan_app
-   ```
-6. Create a virtual environment:
-   ```powershell
-   py -3 -m venv .venv
-   ```
-7. Activate it:
-   ```powershell
-   .venv\Scripts\activate
-   ```
-8. Install the Python packages:
-   ```powershell
-   python -m pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-9. Start the app:
-   ```powershell
-   python main_headless.py
-   ```
-10. If Windows blocks VLC or Python the first time, allow them through the prompt.
+```powershell
+cd $HOME\Desktop\athan_app
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```
 
-### Verify Installation
+Same idea: Python and VLC through `winget`, then the environment and the tests.
 
-Run this from the project folder after activating the virtual environment:
+### Options
+
+| Command | What it does |
+| --- | --- |
+| `./setup.sh` | Install or update everything. Run it any time. |
+| `./setup.sh --clean` | Delete this app's Python environment first, so every package is downloaded fresh at its newest version. Use this when something is broken and you want a clean slate. |
+| `./setup.sh --autostart` | Also start the app automatically every time you log in. |
+| `./setup.sh --no-app` | Set up Python only; skip building the `.app`. |
+| `./setup.sh --help` | Print this list. |
+
+On Windows the flags are `-Clean` and `-NoApp`.
+
+### What it replaces, and what it leaves alone
+
+This matters, because "reinstall everything" can mean two very different things.
+
+**Upgraded, never removed:** Homebrew, Python, VLC, ffmpeg. These are shared
+with the rest of your computer. Uninstalling VLC to reinstall it would take it
+away from everything else that uses it, and an interrupted download would leave
+you with no VLC at all. `brew upgrade` already gets you the current version,
+which is the actual goal.
+
+**Deleted and rebuilt every run:** `build/` and `dist/`, so a stale app bundle
+can never be mistaken for the one you just built.
+
+**Deleted and rebuilt with `--clean`:** `.venv`, this app's private Python
+environment. That is the real "wipe it and start over" — every Python package
+comes down fresh at its newest version. Nothing outside the project folder is
+touched, and your settings in `~/.athan_app/` survive.
+
+The script also rebuilds `.venv` on its own, without being asked, if it finds
+the existing one broken — most often because the Python it was built from has
+since been upgraded out from under it.
+
+### If something goes wrong
+
+The script checks its own work and says which part failed. Two checks are worth
+knowing about:
+
+- **tkinter** — without it the app runs and plays the athan, but its window
+  never opens. Homebrew keeps Tkinter in a separate `python-tk` formula, and
+  a Python missing it is the single most common cause of "the menu-bar icon
+  does nothing". The script refuses to continue rather than build an app with
+  no window in it.
+- **VLC** — on Apple Silicon you need the arm64 build, not the Intel one. An
+  Intel VLC on an M-series Mac loads but plays nothing.
+
+Run the checks yourself at any time:
 
 ```bash
-python3 test_core.py
-python3 -c "import tkinter; print('tkinter OK', tkinter.TkVersion)"
+.venv/bin/python -c "import tkinter; print('tkinter OK', tkinter.TkVersion)"
+.venv/bin/python -c "import vlc; vlc.Instance('--intf','dummy'); print('VLC OK')"
+.venv/bin/python tests/test_quran_library.py
 ```
 
-The second line matters as much as the first. If it raises
-`ModuleNotFoundError: No module named '_tkinter'`, the app will run and play the
-athan but its window will never open — see Troubleshooting below.
 
-On Windows:
+## 🌙 Running at login (macOS)
 
-```powershell
-python test_core.py
+```bash
+./setup.sh --autostart
 ```
 
-## 📦 Package as a Desktop App
+This installs a launchd agent that starts the menu-bar app every time you log
+in, wrapped in `caffeinate` so the Mac stays awake for prayer times. Look for
+the crescent in the menu bar, top-right.
 
-The repo now includes PyInstaller-based desktop packaging support.
+```bash
+# Restart it
+launchctl kickstart -k "gui/$(id -u)/com.apa.athan-app"
 
-### macOS App Bundle
+# Stop it and remove auto-start
+launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/com.apa.athan-app.plist
+rm ~/Library/LaunchAgents/com.apa.athan-app.plist
 
-1. Go to the project folder:
-   ```bash
-   cd /path/to/athan_app
-   ```
-2. Make the build script executable:
-   ```bash
-   chmod +x packaging/build_macos_app.sh
-   ```
-3. Build the app:
-   ```bash
-   ./packaging/build_macos_app.sh
-   ```
-4. The built app will be created at:
-   ```text
-   dist/AthanApp.app
-   ```
+# Watch the logs
+tail -f ~/.athan_app/launchd.stdout.log
+```
 
-### Windows Desktop App
+For a headless machine with no menu bar, `macos/install_launch_agent.sh` runs
+`main_headless.py` under the same agent label instead.
 
-1. Open PowerShell in the project folder.
-2. Run:
-   ```powershell
-   .\packaging\build_windows_app.ps1
-   ```
-3. The packaged app folder will be created at:
-   ```text
-   dist\AthanApp
-   ```
+## 📦 Packaging notes
 
-### Packaging Notes
+`./setup.sh` builds the app for you; these are the details behind it.
 
-- Packaging uses `onedir` mode because VLC bindings and bundled assets are more reliable that way.
-- Custom audio files can be overridden after install by placing them in:
-  ```text
-  ~/.athan_app/assets/audio/
-  ```
-- Desktop packaging requires the extra dependency file:
-  ```text
-  requirements-desktop.txt
-  ```
+- The build is `onedir`, not `onefile` — the VLC bindings and bundled assets
+  are far more reliable that way.
+- The build interpreter must have Tkinter. PyInstaller can only bundle what it
+  can import, so a Python without it produces a valid-looking `.app` whose
+  menu-bar icon opens nothing. Both `setup.sh` and
+  `packaging/build_macos_app.sh` refuse to build in that state.
+- Custom audio can be dropped into `~/.athan_app/assets/audio/` after install;
+  it overrides the bundled files without a rebuild.
+- To build without the rest of the setup: `./packaging/build_macos_app.sh`, or
+  `.\packaging\build_windows_app.ps1` on Windows.
+
 
 ## 📱 Usage
 
@@ -524,11 +326,12 @@ You can also change any of these paths in `config.json`. If a prayer-specific At
 
 ## 🔧 Testing
 
-Test the core functionality:
+`./setup.sh` runs the last two automatically. Any of them can be run directly:
 
 ```bash
-cd ~/.athan_app
-python3 test_core.py
+.venv/bin/python test_core.py               # config, API, audio, scheduler
+.venv/bin/python tests/test_quran_library.py # local recordings and the player
+.venv/bin/python tests/test_app_commands.py  # the dashboard -> daemon channel
 ```
 
 This will test:
@@ -616,21 +419,14 @@ This is almost always missing Tkinter. Check first:
 .venv/bin/python -c "import tkinter"
 ```
 
-`ModuleNotFoundError: No module named '_tkinter'` confirms it. Homebrew ships Python
-without Tkinter:
+`ModuleNotFoundError: No module named '_tkinter'` confirms it — Homebrew keeps
+Tkinter in a separate formula. One command fixes the whole chain: it installs
+`python-tk` for the right Python version, rebuilds the environment around it,
+and rebuilds the app bundle, which also has to be redone because a bundle built
+without Tk stays broken however you fix the environment.
 
 ```bash
-brew install python-tk        # or python-tk@3.14 to match your version
-rm -rf .venv && python3 -m venv .venv
-pip install -r requirements.txt -r requirements-desktop.txt
-```
-
-**If you run the packaged app** (`dist/AthanApp.app`, which is what the menu-bar
-launchd agent starts), fixing the venv is not enough — the bundle was built without
-Tk and has to be rebuilt:
-
-```bash
-bash packaging/build_macos_app.sh
+./setup.sh --clean
 launchctl kickstart -k gui/$(id -u)/com.apa.athan-app
 ```
 
