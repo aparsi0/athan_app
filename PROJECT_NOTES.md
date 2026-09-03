@@ -55,11 +55,13 @@ spin up a fresh unused port rather than trusting a reload.
 ```
 athan_app/
 ├── PROJECT_NOTES.md          ← this file
-├── README.md                 desktop-app install guide (all platforms + menu-bar auto-start)
+├── README.md                 install guide (one command, all platforms + phones)
+├── setup.sh, setup.ps1       THE installer/updater/repairer (macOS+Linux, Windows)
 ├── main.py / main_headless.py            desktop app entry points (GUI / headless)
 ├── requirements.txt, requirements-desktop.txt
 ├── test_core.py, tests/                  desktop app tests
-├── install.sh, export_for_sharing.sh
+├── install.sh                shim onto setup.sh, for old links
+├── export_for_sharing.sh
 ├── config/settings.py                    desktop ConfigManager (JSON config, defaults)
 ├── core/                                 desktop engine
 │   ├── audio_player.py                     VLC playback
@@ -423,7 +425,9 @@ any moment; `Scene._debugMinutes = undefined` to return to the real clock.
     import, so it warned and shipped a valid-looking .app with no Tk in it.
 
     `packaging/build_macos_app.sh` now fails fast when the build interpreter has no tkinter,
-    so this cannot ship again. **Rebuilding requires `brew install python-tk@3.14` first.**
+    so this cannot ship again. `./setup.sh` now installs the matching `python-tk`
+    itself and refuses any interpreter that cannot `import tkinter`, so the
+    manual step is gone.
 
     **The lesson, and it recurs in this project:** `DEVNULL` on a subprocess you depend on is
     the same defect as `.catch(() => {})` on the service-worker registration (changelog 17) —

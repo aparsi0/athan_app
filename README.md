@@ -37,6 +37,15 @@ keeps working whether or not a browser is open.
 One command. It works the first time and every time after — the same command
 installs, updates, and repairs.
 
+| Your system | What to do |
+| --- | --- |
+| **macOS** (Intel or Apple Silicon) | `./setup.sh` |
+| **Linux** (Debian/Ubuntu) | `./setup.sh` |
+| **Windows 10 / 11** | `powershell -ExecutionPolicy Bypass -File .\setup.ps1` |
+| **iPhone / iPad** | Nothing to install — [open the website](https://aparsi0.github.io/athan_app/) and Share → Add to Home Screen |
+| **Android** | Nothing to install — [open the website](https://aparsi0.github.io/athan_app/) and menu → Install app |
+| **Anything else with a browser** | [Open the website](https://aparsi0.github.io/athan_app/) |
+
 ### macOS and Linux
 
 ```bash
@@ -58,6 +67,10 @@ cd ~/Desktop/athan_app && ./setup.sh
 
 If Terminal says `permission denied`, run `chmod +x setup.sh` once and try again.
 
+On Linux, `apt` needs your password once; everything else is the same. The
+menu-bar app is macOS-only, so on Linux the script sets up Python and stops
+there — run it with `python main.py`, or `main_headless.py` on a server.
+
 ### Windows 10 / 11
 
 ```powershell
@@ -65,7 +78,33 @@ cd $HOME\Desktop\athan_app
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-Same idea: Python and VLC through `winget`, then the environment and the tests.
+Same idea: Python and VLC through `winget`, then the environment, then the
+tests. If PowerShell refuses to run the file, that is the execution policy —
+the `-ExecutionPolicy Bypass` in the command above is what gets past it, so
+copy the whole line rather than just `.\setup.ps1`.
+
+Windows has no menu-bar equivalent; run the app with
+`.\.venv\Scripts\python.exe main.py`.
+
+### iPhone, iPad and Android
+
+There is nothing to install and nothing to build. The web version is the
+**full** app — prayer times, athan, azkar, the Quran tab with four mushafs,
+the morning Quran window, and the day/night sky — and it runs in any browser:
+
+**<https://aparsi0.github.io/athan_app/>**
+
+Add it to your home screen and it behaves like a real app, with its own icon,
+no browser chrome, and offline support:
+
+- **iPhone / iPad (Safari):** Share button → **Add to Home Screen**
+- **Android (Chrome):** ⋮ menu → **Install app** (or **Add to Home Screen**)
+
+One caveat worth knowing on a phone: browsers suspend background tabs, so the
+athan is reliable while the page is open — as an installed app in its own
+window it is treated far better than a background tab. For a phone that must
+sound the athan with the screen off, a native athan app is the right tool; this
+is a web app and cannot outrank the operating system's power management.
 
 ### Options
 
