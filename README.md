@@ -164,6 +164,8 @@ Run the checks yourself at any time:
 
 ## 🌙 Running at login (macOS)
 
+**Turn it on:**
+
 ```bash
 ./setup.sh --autostart
 ```
@@ -172,13 +174,52 @@ This installs a launchd agent that starts the menu-bar app every time you log
 in, wrapped in `caffeinate` so the Mac stays awake for prayer times. Look for
 the crescent in the menu bar, top-right.
 
+**Turn it off** — quits it now, and it stays off through reboots:
+
+```bash
+./setup.sh --no-autostart
+```
+
+That does nothing else: no rebuild, no package downloads. The equivalent by
+hand, if you would rather see what it does:
+
+```bash
+launchctl bootout  gui/$(id -u)/com.apa.athan-app 2>/dev/null
+launchctl disable  gui/$(id -u)/com.apa.athan-app
+```
+
+`bootout` alone is not enough — the agent file stays in `~/Library/LaunchAgents`
+and would load again at the next login. `disable` is the half that persists.
+To reverse it by hand, `enable` then `bootstrap`:
+
+```bash
+launchctl enable    gui/$(id -u)/com.apa.athan-app
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.apa.athan-app.plist
+```
+
+### Quit means quit
+
+The agent used to set `KeepAlive` to `true`, which relaunches the app the
+instant it exits **for any reason** — so Quit in the menu bar appeared to do
+nothing at all. launchd simply put it straight back.
+
+It is now `KeepAlive: { SuccessfulExit: false }`, which keeps the half that
+matters: a crash is still restarted, because an athan that dies at 3 a.m. and
+stays dead is worse than useless, while a deliberate Quit is respected until you
+open the app again or log in again.
+
+If you installed auto-start before 2026-09-03 you have the old behaviour, since
+the agent in `~/Library/LaunchAgents` is a copy made at install time. Re-run
+`./setup.sh --autostart` once to pick up the change.
+
+### Everyday commands
+
 ```bash
 # Restart it
 launchctl kickstart -k "gui/$(id -u)/com.apa.athan-app"
 
-# Stop it and remove auto-start
-launchctl bootout "gui/$(id -u)" ~/Library/LaunchAgents/com.apa.athan-app.plist
-rm ~/Library/LaunchAgents/com.apa.athan-app.plist
+# Is it running?
+launchctl print "gui/$(id -u)/com.apa.athan-app" | head
 
 # Watch the logs
 tail -f ~/.athan_app/launchd.stdout.log

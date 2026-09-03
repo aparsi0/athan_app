@@ -18,8 +18,17 @@
   <key>RunAtLoad</key>
   <true/>
 
+  <!-- Not <true/>. That relaunches the app the instant it exits, for ANY
+       reason, so Quit in the menu bar does nothing you can see: launchd puts
+       it straight back. SuccessfulExit=false keeps the useful half — a crash
+       is still restarted, because an athan that dies at 3am and stays dead is
+       worse than useless — while a clean Quit is respected until you open it
+       again or log in again. -->
   <key>KeepAlive</key>
-  <true/>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
 
   <key>StandardOutPath</key>
   <string>__STDOUT_LOG__</string>
