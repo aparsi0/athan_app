@@ -32,128 +32,305 @@ Quran tab with four complete mushafs and a living day/night sky. Installable as 
 Everything below is for the **desktop app**, which runs natively in the macOS menu bar and
 keeps working whether or not a browser is open.
 
-## 🚀 Installation
+## 🚀 Getting the athan running
 
-One command. It works the first time and every time after — the same command
-installs, updates, and repairs.
-
-| Your system | What to do |
+| Your device | What it takes |
 | --- | --- |
-| **macOS** (Intel or Apple Silicon) | `./setup.sh` |
-| **Linux** (Debian/Ubuntu) | `./setup.sh` |
-| **Windows 10 / 11** | `powershell -ExecutionPolicy Bypass -File .\setup.ps1` |
-| **iPhone / iPad** | Nothing to install — [open the website](https://aparsi0.github.io/athan_app/) and Share → Add to Home Screen |
-| **Android** | Nothing to install — [open the website](https://aparsi0.github.io/athan_app/) and menu → Install app |
-| **Anything else with a browser** | [Open the website](https://aparsi0.github.io/athan_app/) |
+| **[Phone or tablet](#phone-or-tablet)** | Nothing to install. Open a web page, add it to your home screen. |
+| **[Mac or Linux](#mac-or-linux)** | Two lines you copy and paste. You get a menu-bar app. |
+| **[Windows](#windows-10-and-11)** | Same app, set up through PowerShell. |
 
-### macOS and Linux
+---
+
+## Phone or tablet
+
+There is nothing to download and no app store involved. The web version **is**
+the full app — prayer times, the athan, azkar, the Quran tab and the living sky.
+
+**<https://aparsi0.github.io/athan_app/>**
+
+Open that link, then add it to your home screen so it gets its own icon and
+opens without browser bars:
+
+- **iPhone or iPad** — in Safari, tap the Share button (the square with an arrow
+  coming out of it), scroll down, tap **Add to Home Screen**.
+- **Android** — in Chrome, tap the **⋮** menu, tap **Install app** (sometimes
+  called *Add to Home Screen*).
+
+The first time you open it, allow **sound** and **location** when asked.
+Location stays on your phone; it is only used to work out your prayer times.
+
+### Keeping it awake: leave the Quran playing
+
+Phones freeze web pages they think you have stopped using, and a frozen page
+cannot sound the athan. A page that is **playing audio** is treated as active
+and does not get frozen — so open the القرآن الكريم tab, start a reciter, and
+turn the volume down as low as you like. The Quran keeps playing, the page stays
+awake, and the athan interrupts it at prayer time and hands it back afterwards.
+
+**The limits, honestly.** This is a web page and it cannot outrank your phone's
+battery saver. With the app open — especially with audio playing — the athan is
+dependable. Closed, or with the screen off for hours, it may not fire. It also
+streams the Quran over the network, so use Wi-Fi if your data is limited. If you
+need an athan that always sounds with the phone in your pocket, use a native
+athan app for that and this for everything else.
+
+---
+
+## Mac or Linux
+
+This installs a real app: a crescent in the menu bar, prayer times, the athan
+through your speakers, and the Quran features.
+
+**1. Open Terminal.** Terminal is an app already on your Mac that lets you type
+instructions instead of clicking. Press **⌘ + Space**, type **Terminal**, press
+**Return**. A window with a blinking cursor opens. That is all it is. On Linux,
+open your Terminal the usual way for your desktop.
+
+**2. Copy the files to your computer.** Paste this and press **Return**:
+
+```bash
+git clone https://github.com/aparsi0/athan_app.git ~/Desktop/athan_app
+```
+
+> The very first time, macOS may ask to install **developer tools**. Say yes,
+> wait for it to finish, then paste the line again.
+
+**3. Run the setup.** The first line moves into the folder you just downloaded;
+the second does everything else.
 
 ```bash
 cd ~/Desktop/athan_app
 ./setup.sh
 ```
 
-That is the whole thing. It installs anything missing (Homebrew, Python,
-Tkinter, VLC, ffmpeg), upgrades anything out of date, creates the Python
-environment, runs the test suite, builds `AthanApp.app`, and copies it to
-`/Applications`.
+It installs anything missing, upgrades anything old, runs its own tests, builds
+the app and puts it in your Applications folder. Expect a few minutes and a lot
+of scrolling text. It finishes by telling you what to do next.
 
-Starting from nothing, with no copy of the project yet:
+> If it says `permission denied`, run `chmod +x setup.sh` once, then
+> `./setup.sh` again.
+
+**4. Open it.**
 
 ```bash
-git clone https://github.com/aparsi0/athan_app.git ~/Desktop/athan_app
-cd ~/Desktop/athan_app && ./setup.sh
+open /Applications/AthanApp.app
 ```
 
-If Terminal says `permission denied`, run `chmod +x setup.sh` once and try again.
+A crescent appears in the menu bar at the top right. Click it for the next
+prayer, today's schedule, the تلاوات recitals, settings, and Quit.
 
-On Linux, `apt` needs your password once; everything else is the same. The
-menu-bar app is macOS-only, so on Linux the script sets up Python and stops
-there — run it with `python main.py`, or `main_headless.py` on a server.
+> macOS may refuse the first time because the app is not signed by an Apple
+> developer account. Go to **System Settings → Privacy & Security**, scroll
+> down, click **Open Anyway**.
 
-### Windows 10 / 11
+**5. Make it start by itself**, so the athan works every day without you opening
+anything:
+
+```bash
+./setup.sh --autostart
+```
+
+Restart the Mac once to confirm the crescent comes back on its own.
+
+**Linux differs in two ways:** `apt` asks for your password once, and there is
+no menu-bar app — run it with `.venv/bin/python main.py`, or
+`main_headless.py` on a machine with no screen.
+
+---
+
+## Windows 10 and 11
+
+**1. Open PowerShell.** Press **Start**, type **PowerShell**, press **Enter**.
+
+**2. Copy the files down.**
+
+```powershell
+git clone https://github.com/aparsi0/athan_app.git $HOME\Desktop\athan_app
+```
+
+> If Windows does not know `git`, install it with `winget install Git.Git`,
+> then close and reopen PowerShell.
+
+**3. Run the setup.**
 
 ```powershell
 cd $HOME\Desktop\athan_app
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-Same idea: Python and VLC through `winget`, then the environment, then the
-tests. If PowerShell refuses to run the file, that is the execution policy —
-the `-ExecutionPolicy Bypass` in the command above is what gets past it, so
-copy the whole line rather than just `.\setup.ps1`.
+`-ExecutionPolicy Bypass` is part of the command, not decoration — Windows
+blocks scripts by default and that is what gets past it. Copy the whole line.
 
-Windows has no menu-bar equivalent; run the app with
-`.\.venv\Scripts\python.exe main.py`.
+**4. Start it.**
 
-### iPhone, iPad and Android
+```powershell
+.\.venv\Scripts\python.exe main.py
+```
 
-There is nothing to install and nothing to build. The web version is the
-**full** app — prayer times, athan, azkar, the Quran tab with four mushafs,
-the morning Quran window, and the day/night sky — and it runs in any browser:
+Windows has no menu-bar equivalent, so leave that window open while you want the
+athan running.
 
-**<https://aparsi0.github.io/athan_app/>**
+---
 
-Add it to your home screen and it behaves like a real app, with its own icon,
-no browser chrome, and offline support:
+## Starting at login, and stopping it (macOS)
 
-- **iPhone / iPad (Safari):** Share button → **Add to Home Screen**
-- **Android (Chrome):** ⋮ menu → **Install app** (or **Add to Home Screen**)
+The everyday way is `./setup.sh --autostart` to turn it on and
+`./setup.sh --no-autostart` to turn it off. Both run from the project folder.
+Below is what those actually do, if you would rather drive it yourself.
 
-One caveat worth knowing on a phone: browsers suspend background tabs, so the
-athan is reliable while the page is open — as an installed app in its own
-window it is treated far better than a background tab. For a phone that must
-sound the athan with the screen off, a native athan app is the right tool; this
-is a web app and cannot outrank the operating system's power management.
+**Turn it on:**
 
-### Options
+```bash
+launchctl enable    gui/$(id -u)/com.apa.athan-app
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.apa.athan-app.plist
+launchctl kickstart -k gui/$(id -u)/com.apa.athan-app
+```
 
-| Command | What it does |
+**Turn it off:**
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.apa.athan-app.plist
+launchctl disable gui/$(id -u)/com.apa.athan-app
+```
+
+Both lines matter. `bootout` stops it now, but the agent file stays in your
+`LaunchAgents` folder and would load again at your next login. `disable` is the
+half that persists.
+
+**Check what it is doing:**
+
+```bash
+launchctl print gui/$(id -u)/com.apa.athan-app | head   # state = running
+launchctl list | grep com.apa.athan-app
+launchctl print-disabled gui/$(id -u) | grep com.apa.athan-app
+```
+
+Logs live in `~/.athan_app/` — `launchd.stdout.log` for normal output,
+`launchd.stderr.log` for crashes, `helper-window.log` if the dashboard window
+will not open.
+
+**Quit now means quit.** The agent used to be set to relaunch the app the
+instant it exited, for any reason, so Quit in the menu bar appeared to do
+nothing. It now restarts only after a crash — an athan that dies at 3 a.m. and
+stays dead is worse than useless — and respects a deliberate Quit until your
+next login.
+
+---
+
+## Keeping the Mac awake
+
+A sleeping Mac plays no athan. So the login agent does not run the app directly
+— it runs it inside `caffeinate`, which holds the machine awake for exactly as
+long as the app is alive and lets go the moment it exits.
+
+```bash
+caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp
+```
+
+| Flag | What it holds off |
 | --- | --- |
-| `./setup.sh` | Install or update everything. Run it any time. |
-| `./setup.sh --clean` | Delete this app's Python environment first, so every package is downloaded fresh at its newest version. Use this when something is broken and you want a clean slate. |
-| `./setup.sh --autostart` | Also start the app automatically every time you log in. |
-| `./setup.sh --no-app` | Set up Python only; skip building the `.app`. |
-| `./setup.sh --help` | Print this list. |
+| `-i` | idle sleep |
+| `-m` | disk idle sleep |
+| `-s` | sleep while plugged into power |
+| `-d` | display sleep — **not used**, see below |
+
+This was `-dims` until September 2026. The extra `d` keeps the *screen* lit as
+well, all night, every night, which does nothing for prayer times. If you do
+want the display held on, change `caffeinate -ims` back to `caffeinate -dims` in
+`macos/com.apa.athan-menubar.plist` and run `./setup.sh --autostart` again.
+
+**Running it awake from Terminal instead.** This holds the window — closing it
+stops both:
+
+```bash
+caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp
+```
+
+Or let it go on its own so you can close the window:
+
+```bash
+nohup caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp >/dev/null 2>&1 &
+```
+
+And headless — no menu-bar icon, straight from the project folder:
+
+```bash
+caffeinate -i .venv/bin/python main_headless.py
+```
+
+> The menu-bar agent and the headless agent share one name, so installing either
+> replaces the other. You can never end up with two athans playing at once.
+
+---
+
+## Updating and repairing
+
+The same command every time. There is no separate updater to remember and no
+wrong one to pick.
+
+```bash
+cd ~/Desktop/athan_app
+git pull
+./setup.sh
+```
+
+| Add this | To |
+| --- | --- |
+| `--clean` | throw away the app's Python environment first, so every package comes down fresh. Use it when something is broken. |
+| `--autostart` | start the app at every login |
+| `--no-autostart` | stop that, and quit it now. Nothing else runs — no rebuild, no downloads. |
+| `--no-app` | set up Python only, skip building the app |
+| `--help` | print this list |
 
 On Windows the flags are `-Clean` and `-NoApp`.
 
 ### What it replaces, and what it leaves alone
 
-This matters, because "reinstall everything" can mean two very different things.
+**Upgraded, never removed:** Homebrew, Python, VLC, ffmpeg. Your whole computer
+shares those — uninstalling VLC to reinstall it would take it away from
+everything else that uses it, and a download that failed halfway would leave you
+with none.
 
-**Upgraded, never removed:** Homebrew, Python, VLC, ffmpeg. These are shared
-with the rest of your computer. Uninstalling VLC to reinstall it would take it
-away from everything else that uses it, and an interrupted download would leave
-you with no VLC at all. `brew upgrade` already gets you the current version,
-which is the actual goal.
+**Rebuilt every run:** `build/` and `dist/`, so a stale app can never be
+mistaken for a fresh one. With `--clean`, `.venv` as well.
 
-**Deleted and rebuilt every run:** `build/` and `dist/`, so a stale app bundle
-can never be mistaken for the one you just built.
-
-**Deleted and rebuilt with `--clean`:** `.venv`, this app's private Python
-environment. That is the real "wipe it and start over" — every Python package
-comes down fresh at its newest version. Nothing outside the project folder is
-touched, and your settings in `~/.athan_app/` survive.
+**Never touched:** anything outside the project folder, including your settings
+and custom sounds in `~/.athan_app/`.
 
 The script also rebuilds `.venv` on its own, without being asked, if it finds
 the existing one broken — most often because the Python it was built from has
 since been upgraded out from under it.
 
-### If something goes wrong
+---
 
-The script checks its own work and says which part failed. Two checks are worth
-knowing about:
+## If something goes wrong
 
-- **tkinter** — without it the app runs and plays the athan, but its window
-  never opens. Homebrew keeps Tkinter in a separate `python-tk` formula, and
-  a Python missing it is the single most common cause of "the menu-bar icon
-  does nothing". The script refuses to continue rather than build an app with
-  no window in it.
-- **VLC** — on Apple Silicon you need the arm64 build, not the Intel one. An
-  Intel VLC on an M-series Mac loads but plays nothing.
+**The crescent is there, but clicking it opens nothing.** Almost always a Python
+missing Tkinter, the part that draws windows. Homebrew keeps it in a separate
+package, so a Python without it builds an app that runs and plays the athan but
+has no window inside it. One command fixes the whole chain — it installs
+`python-tk` for the right Python version, rebuilds the environment around it,
+and rebuilds the app, which also has to be redone because a bundle built without
+Tk stays broken however you fix the environment:
 
-Run the checks yourself at any time:
+```bash
+./setup.sh --clean
+```
+
+**No sound.** On Apple Silicon you need the **arm64** build of VLC, not the
+Intel one. An Intel VLC on an M-series Mac loads without complaint and plays
+nothing.
+
+**Prayer times not updating.** Check the network, then the log:
+
+```bash
+curl -s "https://api.aladhan.com/v1/status" | grep -q "OK" && echo "API OK" || echo "API unreachable"
+tail -f ~/.athan_app/athan_app.log
+```
+
+**Check it yourself.** Setup runs these itself and tells you which one failed,
+so you rarely need them by hand:
 
 ```bash
 .venv/bin/python -c "import tkinter; print('tkinter OK', tkinter.TkVersion)"
@@ -161,123 +338,6 @@ Run the checks yourself at any time:
 .venv/bin/python tests/test_quran_library.py
 ```
 
-
-## 🌙 Running at login (macOS)
-
-**Turn it on:**
-
-```bash
-./setup.sh --autostart
-```
-
-This installs a launchd agent that starts the menu-bar app every time you log
-in. Look for the crescent in the menu bar, top-right.
-
-**Verify it took:**
-
-```bash
-launchctl print "gui/$(id -u)/com.apa.athan-app" | head   # state should say: running
-```
-
-Restart the Mac once to confirm it comes back on its own.
-
-### Keeping the Mac awake
-
-A sleeping Mac plays no athan, so the agent does not run the app directly — it
-runs it inside `caffeinate`, which holds the machine awake for exactly as long
-as the app is alive and lets go the moment it exits:
-
-```
-caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp
-```
-
-| flag | effect |
-| --- | --- |
-| `-i` | no idle sleep |
-| `-m` | no disk idle sleep |
-| `-s` | no sleep while on AC power |
-| `-d` | **also** keeps the display awake — not used, see below |
-
-This was `-dims` until 2026-09-04. The extra `d` keeps the *screen* lit as well,
-all night, every night, which does nothing for prayer times. If you do want the
-display kept on, change `caffeinate -ims` back to `caffeinate -dims` in
-`macos/com.apa.athan-menubar.plist` and run `./setup.sh --autostart` again.
-
-To run it awake from a Terminal instead of through launchd:
-
-```bash
-caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp
-```
-
-That holds the window — closing it stops both. To detach it:
-
-```bash
-nohup caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp >/dev/null 2>&1 &
-```
-
-Headless, from a source checkout, same idea:
-
-```bash
-caffeinate -i .venv/bin/python main_headless.py
-```
-
-**Turn it off** — quits it now, and it stays off through reboots:
-
-```bash
-./setup.sh --no-autostart
-```
-
-That does nothing else: no rebuild, no package downloads. The equivalent by
-hand, if you would rather see what it does:
-
-```bash
-launchctl bootout  gui/$(id -u)/com.apa.athan-app 2>/dev/null
-launchctl disable  gui/$(id -u)/com.apa.athan-app
-```
-
-`bootout` alone is not enough — the agent file stays in `~/Library/LaunchAgents`
-and would load again at the next login. `disable` is the half that persists.
-To reverse it by hand, `enable` then `bootstrap`:
-
-```bash
-launchctl enable    gui/$(id -u)/com.apa.athan-app
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.apa.athan-app.plist
-```
-
-### Quit means quit
-
-The agent used to set `KeepAlive` to `true`, which relaunches the app the
-instant it exits **for any reason** — so Quit in the menu bar appeared to do
-nothing at all. launchd simply put it straight back.
-
-It is now `KeepAlive: { SuccessfulExit: false }`, which keeps the half that
-matters: a crash is still restarted, because an athan that dies at 3 a.m. and
-stays dead is worse than useless, while a deliberate Quit is respected until you
-open the app again or log in again.
-
-If you installed auto-start before 2026-09-03 you have the old behaviour, since
-the agent in `~/Library/LaunchAgents` is a copy made at install time. Re-run
-`./setup.sh --autostart` once to pick up the change.
-
-### Everyday commands
-
-```bash
-# Restart it
-launchctl kickstart -k "gui/$(id -u)/com.apa.athan-app"
-
-# Is it running?
-launchctl print "gui/$(id -u)/com.apa.athan-app" | head
-
-# Watch the logs
-tail -f ~/.athan_app/launchd.stdout.log
-tail -f ~/.athan_app/launchd.stderr.log    # crashes and startup failures land here
-tail -f ~/.athan_app/helper-window.log     # why the dashboard window would not open
-```
-
-For a headless machine with no menu bar, `macos/install_launch_agent.sh` runs
-`main_headless.py` under the same agent label instead. Same label means
-installing one **replaces** the other, so you can never end up with two athans
-playing at once.
 
 ## 📦 Packaging notes
 
@@ -514,9 +574,9 @@ Isha:    09:39 PM
 ## 🖥️ System Requirements
 
 ### Minimum Requirements
-- **Python**: 3.8 or higher
+- **Python**: 3.10 or higher, with Tkinter
 - **RAM**: 50MB
-- **Storage**: 100MB
+- **Storage**: 250MB for the built app
 - **Network**: Internet connection for prayer times
 
 ### Supported Platforms
@@ -525,78 +585,40 @@ Isha:    09:39 PM
 - **Windows**: 10/11 (with WSL or native Python)
 
 ### Dependencies
-- `python3` and `pip3`
-- `vlc` media player
-- `tkinter` (the dashboard window). **On macOS Homebrew this is a separate formula**
-  — `brew install python-tk` — and is not included by `brew install python`
-- Python packages (auto-installed):
-  - `schedule`, `python-vlc`, `pystray`, `requests`, `pytz`
 
-## 🔍 Troubleshooting
+`./setup.sh` installs and upgrades all of these; the list is here so you know
+what is on your machine, not as something to do by hand.
 
-### Common Issues
+- `python3` 3.10+ **with Tkinter** — on macOS, Homebrew keeps Tkinter in a
+  separate `python-tk` formula that `brew install python` does not pull in
+- `vlc` media player — arm64 build on Apple Silicon
+- `ffmpeg`
+- Python packages: `schedule`, `python-vlc`, `pystray`, `pillow`, `requests`,
+  `pytz`, `pydub`, and `pyinstaller` for building the app
 
-**1. Audio not playing**
-```bash
-# Test VLC installation
-vlc --version
+## 🔍 More troubleshooting
 
-# Test audio file
-python3 -c "from core.audio_player import AudioPlayer; player = AudioPlayer(); print('✅' if player.test_audio_file('assets/audio/Azansoundtrack.m4a') else '❌')"
-```
+The common failures — no window, no sound, prayer times not updating — are
+covered under [If something goes wrong](#if-something-goes-wrong). A few rarer
+ones:
 
-**2. Prayer times not updating**
-```bash
-# Check internet connection
-curl -s "https://api.aladhan.com/v1/status" | grep -q "OK" && echo "✅ API accessible" || echo "❌ API not accessible"
+**The tray icon never appears at all.** You need a desktop session for it. On a
+server or over SSH, run the headless version instead:
+`.venv/bin/python main_headless.py`.
 
-# Check logs
-tail -f ~/.athan_app/athan_app.log
-```
-
-**3. Menu-bar icon appears but clicking it opens nothing**
-
-This is almost always missing Tkinter. Check first:
+**Verbose logging**, when a log line is not enough:
 
 ```bash
-.venv/bin/python -c "import tkinter"
+.venv/bin/python main_headless.py 2>&1 | tee debug.log
 ```
 
-`ModuleNotFoundError: No module named '_tkinter'` confirms it — Homebrew keeps
-Tkinter in a separate formula. One command fixes the whole chain: it installs
-`python-tk` for the right Python version, rebuilds the environment around it,
-and rebuilds the app bundle, which also has to be redone because a bundle built
-without Tk stays broken however you fix the environment.
+**Test one audio file directly:**
 
 ```bash
-./setup.sh --clean
-launchctl kickstart -k gui/$(id -u)/com.apa.athan-app
+.venv/bin/python -c "from core.audio_player import AudioPlayer; \
+print('OK' if AudioPlayer().test_audio_file('assets/audio/Azansoundtrack.m4a') else 'FAILED')"
 ```
 
-The build script now refuses to run if Tkinter is missing, so it cannot silently
-produce a window-less app again.
-
-The helper window's errors are written to `~/.athan_app/helper-window.log`.
-
-**4. System tray not appearing**
-- Ensure you're running in a desktop environment
-- Try the headless version: `athan-app-headless`
-- Check if system tray is enabled in your desktop environment
-
-**5. Permission errors**
-```bash
-# Fix permissions
-chmod +x ~/.athan_app/main.py
-chmod +x ~/.athan_app/main_headless.py
-```
-
-### Debug Mode
-
-Enable verbose logging by editing the configuration or running:
-```bash
-cd ~/.athan_app
-python3 main_headless.py 2>&1 | tee debug.log
-```
 
 ## 📚 API Information
 
