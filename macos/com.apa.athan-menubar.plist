@@ -9,7 +9,14 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>caffeinate -dims "__APP_BINARY__"</string>
+    <!-- caffeinate holds the Mac awake for exactly as long as the program it
+         runs stays alive, then lets go.
+           -i  no idle sleep      -m  no disk idle sleep
+           -s  no sleep on AC power
+         Deliberately NOT -d, which also keeps the DISPLAY awake: the screen
+         would stay lit every night for no benefit to prayer times. Add the d
+         back (caffeinate -dims) if you want the display kept on too. -->
+    <string>caffeinate -ims "__APP_BINARY__"</string>
   </array>
 
   <key>WorkingDirectory</key>

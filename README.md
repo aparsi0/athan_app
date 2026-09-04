@@ -171,8 +171,55 @@ Run the checks yourself at any time:
 ```
 
 This installs a launchd agent that starts the menu-bar app every time you log
-in, wrapped in `caffeinate` so the Mac stays awake for prayer times. Look for
-the crescent in the menu bar, top-right.
+in. Look for the crescent in the menu bar, top-right.
+
+**Verify it took:**
+
+```bash
+launchctl print "gui/$(id -u)/com.apa.athan-app" | head   # state should say: running
+```
+
+Restart the Mac once to confirm it comes back on its own.
+
+### Keeping the Mac awake
+
+A sleeping Mac plays no athan, so the agent does not run the app directly — it
+runs it inside `caffeinate`, which holds the machine awake for exactly as long
+as the app is alive and lets go the moment it exits:
+
+```
+caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp
+```
+
+| flag | effect |
+| --- | --- |
+| `-i` | no idle sleep |
+| `-m` | no disk idle sleep |
+| `-s` | no sleep while on AC power |
+| `-d` | **also** keeps the display awake — not used, see below |
+
+This was `-dims` until 2026-09-04. The extra `d` keeps the *screen* lit as well,
+all night, every night, which does nothing for prayer times. If you do want the
+display kept on, change `caffeinate -ims` back to `caffeinate -dims` in
+`macos/com.apa.athan-menubar.plist` and run `./setup.sh --autostart` again.
+
+To run it awake from a Terminal instead of through launchd:
+
+```bash
+caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp
+```
+
+That holds the window — closing it stops both. To detach it:
+
+```bash
+nohup caffeinate -ims /Applications/AthanApp.app/Contents/MacOS/AthanApp >/dev/null 2>&1 &
+```
+
+Headless, from a source checkout, same idea:
+
+```bash
+caffeinate -i .venv/bin/python main_headless.py
+```
 
 **Turn it off** — quits it now, and it stays off through reboots:
 
@@ -223,10 +270,14 @@ launchctl print "gui/$(id -u)/com.apa.athan-app" | head
 
 # Watch the logs
 tail -f ~/.athan_app/launchd.stdout.log
+tail -f ~/.athan_app/launchd.stderr.log    # crashes and startup failures land here
+tail -f ~/.athan_app/helper-window.log     # why the dashboard window would not open
 ```
 
 For a headless machine with no menu bar, `macos/install_launch_agent.sh` runs
-`main_headless.py` under the same agent label instead.
+`main_headless.py` under the same agent label instead. Same label means
+installing one **replaces** the other, so you can never end up with two athans
+playing at once.
 
 ## 📦 Packaging notes
 
